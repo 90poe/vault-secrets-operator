@@ -31,6 +31,7 @@ build-local: deps unit-test
 
 .PHONY: build
 build:
+	echo $(version) > version/version
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -mod=vendor \
 	-ldflags="-s -w -X github.com/90poe/vault-secrets-operator/internal/version.GitHash=$(git_commit) \
 	-X github.com/90poe/vault-secrets-operator/internal/version.BuildDate=$(built_at) \
