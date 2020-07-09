@@ -1,0 +1,15 @@
+apiVersion: xo.90poe.io/v1alpha1
+kind: VaultCertificate
+metadata:
+  name: example-vaultcertificate
+spec:
+  name: cert-secretfromvault-tls
+  reread_intervals: 300 # 10 minutes
+  type: kubernetes.io/tls
+  tls_certs:
+  - vault_pki_profile: k8s
+    common_name: short-cert
+    ttl: 1
+    ca_cert_key_name: ca.crt
+    cert_key_name: tls.crt
+    private_key_name: tls.key

@@ -1,0 +1,153 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: vaultcertificates.xo.90poe.io
+spec:
+  group: xo.90poe.io
+  names:
+    kind: VaultCertificate
+    listKind: VaultCertificateList
+    plural: vaultcertificates
+    singular: vaultcertificate
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: VaultCertificate is the Schema for the vaultcertificates API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: VaultCertificateSpec defines the desired state of VaultCertificate
+            properties:
+              name:
+                maxLength: 255
+                minLength: 1
+                pattern: ^[^-_+A-Z][^A-Z\\\/\*\?"\<\> ,|#]{1,254}$
+                type: string
+              reread_intervals:
+                description: How offten to re-read secrets from Vault (in seconds).
+                  Min 60 minutes, Max 1 year (in seconds)
+                format: int64
+                maximum: 31536000
+                minimum: 3600
+                type: integer
+              tls_certs:
+                description: TLSCertificates is list of TLSCertificate to be added
+                  to Secret
+                items:
+                  description: TLSCertificate will hold information on how to get
+                    certificates from Vault
+                  properties:
+                    ca_cert_key_name:
+                      description: CACertKeyName would set key name of CA certificate
+                        PEM in secret data. Would be not set in Secret if omited.
+                      minLength: 2
+                      type: string
+                    cert_key_name:
+                      description: CertKeyName would set key name of certificate PEM
+                        in secret data
+                      minLength: 2
+                      type: string
+                    common_name:
+                      description: Prefix of CN for Certificate, domain would be taken
+                        from Profile
+                      minLength: 2
+                      type: string
+                    intermediate_ca:
+                      description: IntermediateCA would allow to generate intermediate
+                        CA for signing other certs (example for linkerd)
+                      type: boolean
+                    intermediate_ca_priv_key_alg:
+                      description: Type of private key for certificate, ec-Prime256-1
+                        by default
+                      minLength: 3
+                      pattern: ^(rsa2048|rsa4096|ec-Prime256-1)$
+                      type: string
+                    max_ttl:
+                      description: Take MAX TTL which is available on PKI
+                      type: boolean
+                    private_key_name:
+                      description: PrivateKeyName would set key name of private key
+                        PEM in secret data
+                      minLength: 2
+                      type: string
+                    revoke_on_delete:
+                      description: RevokeOnDelete would require to delete certificate
+                        upon deletion of CRD
+                      type: boolean
+                    ttl:
+                      description: Certificate TTL in hours, if not defined we would
+                        use default TTL from profile
+                      format: int64
+                      minimum: 1
+                      type: integer
+                    vault_pki_profile:
+                      description: 'Profile in Vault which keeps PKI settings. Profiles
+                        are kept in Vault at path ''secret/secrets-from-vault-operator/profiles/''
+                        Each profile is a prefix, which will be added to secrets name,
+                        example: profile ''linkerd'', then secrets will be ''secret/secrets-from-vault-operator/profiles/linkerd_XXX''
+                        Profile must have such values (XXX is profile name): 1. XXX_pki_path
+                        - Path in Vault to PKI 2. XXX_domain - Domain name to add
+                        to Certificate 3. XXX_default_ttl - Default TTL for certs
+                        in Hours 4. XXX_pki_role - Role which to use for Cert issuing
+                        5. XXX_pki_cache_path - Path to cache in Vault to store TLS
+                        certs. Need to be added to operator default Path'
+                      minLength: 2
+                      type: string
+                  required:
+                  - cert_key_name
+                  - common_name
+                  - private_key_name
+                  - vault_pki_profile
+                  type: object
+                minItems: 1
+                type: array
+              type:
+                description: Type is the type of the Kubernetes secret, which will
+                  be created by the Secrets From Vault Operator.
+                type: string
+            required:
+            - name
+            - reread_intervals
+            - tls_certs
+            - type
+            type: object
+          status:
+            description: VaultCertificateStatus defines the observed state of VaultCertificate
+            properties:
+              cert_serials:
+                additionalProperties:
+                  type: string
+                description: CertificateSerials holds certificate CN as key and serial
+                  as value
+                type: object
+              last_read_time:
+                description: Unix timestamp when secret was read last time, required
+                  for re-reading schedule.  If LastReadTime < now().Seconds() - ReReadIntervals,
+                  then operator would re-read values from Vault
+                format: int64
+                type: integer
+              latest_error:
+                description: LatestError would hold error, if last operation was un-successful,
+                  or it would be empty otherways
+                type: string
+            required:
+            - last_read_time
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
