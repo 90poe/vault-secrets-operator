@@ -1,0 +1,27 @@
+____   ____            .__   __              _________                            __                   ________                              __
+\   \ /   /____   __ __|  |_/  |_           /   _____/ ____   ___________   _____/  |_  ______         \_____  \ ______   ________________ _/  |_  ___________
+ \   Y   /\__  \ |  |  \  |\   __\  ______  \_____  \_/ __ \_/ ___\_  __ \_/ __ \   __\/  ___/  ______  /   |   \\____ \_/ __ \_  __ \__  \\   __\/  _ \_  __ \
+  \     /  / __ \|  |  /  |_|  |   /_____/  /        \  ___/\  \___|  | \/\  ___/|  |  \___ \  /_____/ /    |    \  |_> >  ___/|  | \// __ \|  | (  <_> )  | \/
+   \___/  (____  /____/|____/__|           /_______  /\___  >\___  >__|    \___  >__| /____  >         \_______  /   __/ \___  >__|  (____  /__|  \____/|__|
+               \/                                  \/     \/     \/            \/          \/                  \/|__|        \/           \/
+
+
+/* Humans */
+Sarunas     @sarunask     maintainer
+
+/* Organizations */
+90poe       https://www.openocean.studio/
+
+/* Thanks */
+Thanks to 90poe for giving birth to this project and allowing it to be open sourced.
+
+Also, thanks to all contributors and users (assuming there are more) of vault-secrets-operator.
+
+/* Site */
+
+Last update: -
+Language: English
+Doctype: HTML5
+IDE: VIM/VsCode
+SCM: Git
+Hosting: GitHub
