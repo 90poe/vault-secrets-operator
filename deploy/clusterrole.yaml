@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: vault-secrets-operator
+rules:
+- apiGroups:
+  - xo.90poe.io
+  resources:
+  - vaultsecrets
+  - vaultsecrets/status
+  - vaultcertificates
+  - vaultcertificates/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
