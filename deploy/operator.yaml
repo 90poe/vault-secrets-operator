@@ -9,6 +9,8 @@ spec:
       name: vault-secrets-operator
   template:
     metadata:
+      annotations:
+        iam.amazonaws.com/role: arn:aws:iam::504106747086:role/90poe-vault-secrets-operator-20200710123007250500000008
       labels:
         name: vault-secrets-operator
     spec:
@@ -31,3 +33,11 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "vault-secrets-operator"
+            - name: VAULT_ADDR
+              value: "https://vault:8200"
+            - name: VAULT_SKIP_VERIFY
+              value: "1"
+            - name: VAULT_ROLE_2_ASSUME
+              value: "vault-secrets-operator-role"
+            - name: VAULT_SECRETS_PREFIX
+              value: "secret/some-secret-path"
