@@ -8,6 +8,7 @@ vaultsecrets-operator runs on K8S cluster 1.16 and up. To install it you would n
 1. Admin access to cluster
 2. `kubectl` which is configured to access your cluster and is in your execution path
 3. GNU or *NIX Make which is in your execution path
+4. Vault role and AWS IAM role which grants access to Vault
 
 ## Install to K8S cluster
 
