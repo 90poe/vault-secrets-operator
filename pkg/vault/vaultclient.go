@@ -341,16 +341,18 @@ func (c *Client) renewToken() {
 	renewDur := time.Duration(ttl.Seconds() * 0.7)
 	ticker := time.NewTicker(renewDur * time.Second)
 	defer ticker.Stop()
-	select {
-	case t := <-ticker.C:
-		c.logger.Info(fmt.Sprintf("renew Vault token at time: %v", t), "Renew.Time", t)
-		err = c.getToken()
-		if err != nil {
-			c.logger.Error(err, "could not renew token")
-			c.cancelFn()
+	for {
+		select {
+		case t := <-ticker.C:
+			c.logger.Info(fmt.Sprintf("renew Vault token at time: %v", t), "Renew.Time", t)
+			err = c.getToken()
+			if err != nil {
+				c.logger.Error(err, "could not renew token")
+				c.cancelFn()
+			}
+		case <-c.ctx.Done():
+			return
 		}
-	case <-c.ctx.Done():
-		return
 	}
 }
 
@@ -360,20 +362,22 @@ func (c *Client) pkiTidy() {
 	// Run PKI Tidy every 24 hours
 	ticker := time.NewTicker(consts.VaultPKICleanupInHours * time.Hour)
 	defer ticker.Stop()
-	select {
-	case t := <-ticker.C:
-		c.logger.Info(fmt.Sprintf("run PKI Tidy at: %v", t))
-		for pki := range c.pkis2Clean {
-			err := c.issuePkiTidy(pki)
-			if err != nil {
-				c.logger.Error(err, fmt.Sprintf("could not issue tidy up PKI request '%s'", pki))
-				c.cancelFn()
+	for {
+		select {
+		case t := <-ticker.C:
+			c.logger.Info(fmt.Sprintf("run PKI Tidy at: %v", t))
+			for pki := range c.pkis2Clean {
+				err := c.issuePkiTidy(pki)
+				if err != nil {
+					c.logger.Error(err, fmt.Sprintf("could not issue tidy up PKI request '%s'", pki))
+					c.cancelFn()
+				}
 			}
+		case pkiPath := <-c.pkis2CleanChan:
+			c.pkis2Clean[pkiPath] = true
+		case <-c.ctx.Done():
+			return
 		}
-	case pkiPath := <-c.pkis2CleanChan:
-		c.pkis2Clean[pkiPath] = true
-	case <-c.ctx.Done():
-		return
 	}
 }
 
