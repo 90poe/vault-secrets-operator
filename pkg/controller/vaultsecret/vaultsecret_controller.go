@@ -275,6 +275,10 @@ func (r *ReconcileVaultSecret) populateVaultSecret(instance *xov1alpha1.VaultSec
 		r.log.Error(err, "can't read Secret(s) from Vault")
 		return err
 	}
+	// Add ProvidedSecrets
+	for key, value := range instance.Spec.ProvidedSecrets {
+		newData[key] = []byte(value)
+	}
 	// Populate secret with data we require
 	err = r.populateSecret(instance, found, newData)
 	if err != nil {

@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/hashicorp/vault/api v1.0.4
 	github.com/hashicorp/vault/sdk v0.1.13
-	github.com/operator-framework/operator-sdk v0.18.2
+	github.com/operator-framework/operator-sdk v0.19.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
