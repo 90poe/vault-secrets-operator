@@ -1,6 +1,6 @@
 built_at := $(shell date +%s)
 git_commit := $(shell git describe --dirty --always)
-version=$(shell cat version/version.go | grep Version | cut -d'"' -f2)
+version=$(shell cat version/version | tr -d '\n')
 
 BIN:=./bin
 GOLANGCI_LINT_VERSION?=1.28.0
@@ -31,11 +31,10 @@ build-local: deps unit-test
 
 .PHONY: build
 build:
-	echo $(version) > version/version
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -mod=vendor \
-	-ldflags="-s -w -X github.com/90poe/vault-secrets-operator/internal/version.GitHash=$(git_commit) \
-	-X github.com/90poe/vault-secrets-operator/internal/version.BuildDate=$(built_at) \
-	-X github.com/90poe/vault-secrets-operator/internal/version=$(version)" \
+	-ldflags="-s -w -X github.com/90poe/vault-secrets-operator/version.GitHash=$(git_commit) \
+	-X github.com/90poe/vault-secrets-operator/version.BuildDate=$(built_at) \
+	-X github.com/90poe/vault-secrets-operator/version.Version=$(version)" \
 	-a -o ./artifacts/manager ./cmd/manager
 	mv ./artifacts/manager ./artifacts/manager-unpacked
 	upx -q -o ./artifacts/manager ./artifacts/manager-unpacked
@@ -45,8 +44,8 @@ build:
 build-ci:
 	CGO_ENABLED=0 go build -mod=vendor \
 	-ldflags="-s -w -X github.com/90poe/vault-secrets-operator/internal/version.GitHash=$(git_commit) \
-	-X github.com/90poe/vault-secrets-operator/internal/version.BuildDate=$(built_at) \
-	-X github.com/90poe/vault-secrets-operator/internal/version=$(version)" \
+	-X github.com/90poe/vault-secrets-operator/version.BuildDate=$(built_at) \
+	-X github.com/90poe/vault-secrets-operator/version.Version=$(version)" \
 	-a -o ./artifacts/manager ./cmd/manager
 
 deps:

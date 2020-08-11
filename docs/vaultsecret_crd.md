@@ -27,6 +27,7 @@ Spec section:
 |--------|:---|:------|:---|
 |name|string|Yes|Name of Secret in K8S|
 |secrets_paths|map[string]string|Yes|List of Vault secrets you want to be added to K8S. See <a href="#SecretsPaths">SecretsPaths</a> for more details.|
+|provided_secrets|map[string]string|No|List of secrets you want to be added to K8S verbatim. Required in order to mix secrets from Vault with your own secrets from CRD.|
 |reread_intervals|int|Yes|Seconds how often to re-read secrets values from Vault|
 |type|v1.Secret K8S object Type string|Yes|Type of K8S secret, please see Kubernetes [docs](https://kubernetes.io/docs/concepts/configuration/secret/)|
 

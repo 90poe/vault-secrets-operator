@@ -23,6 +23,10 @@ type VaultSecretSpec struct {
 	// NOTE: 'value' keys in Vault would be base64 encoded for K8S secrets and
 	//       'base64_values' keys in Vault would not be encoded for K8S secrets
 	SecretsPaths map[string]string `json:"secrets_paths"`
+	// ProvidedSecrets are secrets, which we don't need to look for in Vault,
+	//  but take from this structure and push to final secret verbatim.
+	//  Required for mixed secrets, where part is from Vault, part is provided in CRD.
+	ProvidedSecrets map[string]string `json:"provided_secrets,omitempty"`
 	// How offten to re-read secrets from Vault (in seconds).
 	// Min 5 minutes, Max 1 year (in seconds)
 	// +kubebuilder:validation:Minimum=300

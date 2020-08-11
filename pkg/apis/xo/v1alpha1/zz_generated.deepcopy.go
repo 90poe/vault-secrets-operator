@@ -200,6 +200,13 @@ func (in *VaultSecretSpec) DeepCopyInto(out *VaultSecretSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.ProvidedSecrets != nil {
+		in, out := &in.ProvidedSecrets, &out.ProvidedSecrets
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
