@@ -1,4 +1,4 @@
-FROM golang:1.14.4-stretch as base
+FROM golang:1.14.7-stretch as base
 
 COPY . /vault-secrets-operator
 WORKDIR /vault-secrets-operator
