@@ -1,9 +1,8 @@
-package vaultsecret
+package utils
 
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"testing"
@@ -39,19 +38,21 @@ func (t *TestDoer) httpCall(w http.ResponseWriter, req *http.Request) error {
 		time.Sleep(time.Duration(r2r.Delay) * time.Second)
 	}
 	reqURI := req.URL.RequestURI()
+	// FOR INTERNAL REVIEW PURPOSES
+	// fmt.Printf("reqURI=%s\nr2rURI=%s\n", reqURI, r2r.RequestURI)
 	if reqURI != r2r.RequestURI {
 		w.WriteHeader(http.StatusNotFound)
 		return nil
 	}
 	//FOR INTERNAL REVIEW PURPOSES
-	if req.Method == "PUT" || req.Method == "POST" {
-		bytes, err := ioutil.ReadAll(req.Body)
-		defer req.Body.Close()
-		if err != nil {
-			return err
-		}
-		fmt.Printf("%s", string(bytes))
-	}
+	// if req.Method == "PUT" || req.Method == "POST" {
+	// 	bytes, err := ioutil.ReadAll(req.Body)
+	// 	defer req.Body.Close()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	fmt.Printf("%s", string(bytes))
+	// }
 	w.WriteHeader(r2r.ResponceCode)
 	_, err := io.WriteString(w, r2r.Responce)
 	if err != nil {
@@ -75,15 +76,15 @@ func (t *TestDoer) httpCallHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// testHTTPServer creates a test HTTP server that handles requests until
+// MakeTestHTTPServer creates a test HTTP server that handles requests until
 // the listener returned is closed.
-func testHTTPServer(t *testing.T) (*api.Config, net.Listener, *TestDoer) {
+func MakeTestHTTPServer(t *testing.T, queueDepth int) (*api.Config, net.Listener, *TestDoer) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
 
-	testCreateDoer := NewTestDoer(5)
+	testCreateDoer := NewTestDoer(queueDepth)
 
 	server := &http.Server{Handler: http.HandlerFunc(testCreateDoer.httpCallHandler)}
 	//nolint

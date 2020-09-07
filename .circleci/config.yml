@@ -2,7 +2,7 @@ version: 2
 jobs:
   buildtest:
     docker:
-      - image: circleci/golang:1.14.4
+      - image: circleci/golang:1.15.1
     steps:
       - checkout
       - run: make ci
@@ -12,7 +12,7 @@ jobs:
             - "/go/pkg/mod"
   release:
     docker:
-      - image: circleci/golang:1.14.4
+      - image: circleci/golang:1.15.1
     steps:
       - checkout
       - restore_cache:
