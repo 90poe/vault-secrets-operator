@@ -4,11 +4,12 @@ metadata:
   name: example-vaultcertificate
 spec:
   name: cert-secretfromvault-tls
-  reread_intervals: 300 # 10 minutes
+  reread_intervals: 3600 # 1 hour
   type: kubernetes.io/tls
   tls_certs:
   - vault_pki_profile: k8s
     common_name: short-cert
+    revoke_on_delete: true
     ttl: 1
     ca_cert_key_name: ca.crt
     cert_key_name: tls.crt
