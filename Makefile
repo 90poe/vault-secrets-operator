@@ -3,7 +3,7 @@ git_commit := $(shell git describe --dirty --always)
 version=$(shell cat version/version | tr -d '\n')
 
 BIN:=./bin
-GOLANGCI_LINT_VERSION?=1.28.0
+GOLANGCI_LINT_VERSION?=1.30.0
 
 ifeq ($(OS),Windows_NT)
     OSNAME = windows

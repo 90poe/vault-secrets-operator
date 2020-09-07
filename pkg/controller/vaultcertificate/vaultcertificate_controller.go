@@ -137,7 +137,6 @@ func (r *ReconcileVaultCertificate) Reconcile(request reconcile.Request) (_ reco
 	}
 
 	before := instance.DeepCopyObject()
-	// instancePatch := client.MergeFrom(instance.DeepCopy())
 	// Patch after every reconcile loop, if needed
 	defer func() {
 		err = utils.Patch(r.ctx, r.client, before, instance)
@@ -145,6 +144,18 @@ func (r *ReconcileVaultCertificate) Reconcile(request reconcile.Request) (_ reco
 			reterr = kerrors.NewAggregate([]error{reterr, err})
 		}
 	}()
+
+	// deletion logic
+	if !instance.GetDeletionTimestamp().IsZero() {
+		err := r.revokeCertificates(instance)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		instance.SetFinalizers(nil)
+
+		r.log.V(1).Info(fmt.Sprintf("succesfully deleted CRD %s from K8S", instance.Name))
+		return reconcile.Result{}, nil
+	}
 
 	// Check if this Secret already exists
 	found := &corev1.Secret{}
@@ -365,6 +376,27 @@ func (r *ReconcileVaultCertificate) addFinalizer(m *xov1alpha1.VaultCertificate)
 		m.GetDeletionTimestamp() == nil {
 		r.log.Info("adding Finalizer for SecretFromVault")
 		controllerutil.AddFinalizer(m, consts.SecretsFinalizer)
+	}
+	return nil
+}
+
+func (r *ReconcileVaultCertificate) revokeCertificates(cr *xov1alpha1.VaultCertificate) error {
+	for _, cert := range cr.Spec.TLSCertificates {
+		if !cert.RevokeOnDelete {
+			// nothing to do
+			continue
+		}
+		tlsCert, err := vaultpki.New(
+			vaultpki.Profile(cert.VaultPKIProfile),
+			vaultpki.VaultClient(r.vault),
+		)
+		if err != nil {
+			return fmt.Errorf("can't make vaultpki: %w", err)
+		}
+		err = tlsCert.RevokeCertificate(&cert, cr.Status.CertificateSerials)
+		if err != nil {
+			return fmt.Errorf("can't revoke certificate: %w", err)
+		}
 	}
 	return nil
 }

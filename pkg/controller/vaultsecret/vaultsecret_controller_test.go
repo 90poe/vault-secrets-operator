@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/90poe/vault-secrets-operator/pkg/utils"
 	"github.com/90poe/vault-secrets-operator/pkg/vault"
 
 	xov1alpha1 "github.com/90poe/vault-secrets-operator/pkg/apis/xo/v1alpha1"
@@ -26,11 +27,11 @@ type TestCreateUpdateSecret struct {
 	Objects []runtime.Object
 	Status  *xov1alpha1.VaultSecretStatus
 	Err     error
-	R2Rs    map[int]Responce2Req
+	R2Rs    map[int]utils.Responce2Req
 }
 
-func beforeEachTest(t *testing.T, prefix string) (*vault.Client, net.Listener, *TestDoer, *runtime.Scheme) {
-	config, ln, testDoer := testHTTPServer(t)
+func beforeEachTest(t *testing.T, prefix string, queueDepth int) (*vault.Client, net.Listener, *utils.TestDoer, *runtime.Scheme) {
+	config, ln, testDoer := utils.MakeTestHTTPServer(t, queueDepth)
 	client, err := vault.New(
 		vault.Config(config),
 		vault.Addr(config.Address, false),
@@ -52,7 +53,7 @@ func TestReconcile(t *testing.T) {
 		namespace = "operator"
 	)
 
-	client, ln, testDoer, sc := beforeEachTest(t, "test")
+	client, ln, testDoer, sc := beforeEachTest(t, "test", 1)
 	defer ln.Close()
 	defer testDoer.Close()
 	// Create fake K8S client
@@ -117,7 +118,7 @@ func TestCreateUpdate(t *testing.T) {
 			Status: &xov1alpha1.VaultSecretStatus{
 				LastReadTime: now,
 			},
-			R2Rs: map[int]Responce2Req{
+			R2Rs: map[int]utils.Responce2Req{
 				1: {
 					RequestURI:   path.Join("/v1/sys/internal/ui/mounts", prefix, secretPath),
 					ResponceCode: 200,
@@ -190,7 +191,7 @@ func TestCreateUpdate(t *testing.T) {
 			},
 			Err: fmt.Errorf("can't make new Secret: no such secret at path '%s'",
 				path.Join(prefix, secretPath)),
-			R2Rs: map[int]Responce2Req{
+			R2Rs: map[int]utils.Responce2Req{
 				1: {
 					RequestURI:   path.Join("/v1/sys/internal/ui/mounts", prefix, secretPath),
 					ResponceCode: 200,
@@ -273,7 +274,7 @@ func TestCreateUpdate(t *testing.T) {
 			Status: &xov1alpha1.VaultSecretStatus{
 				LastReadTime: now,
 			},
-			R2Rs: map[int]Responce2Req{
+			R2Rs: map[int]utils.Responce2Req{
 				1: {
 					RequestURI:   path.Join("/v1/sys/internal/ui/mounts", prefix, secretPath),
 					ResponceCode: 200,
@@ -367,7 +368,7 @@ func TestCreateUpdate(t *testing.T) {
 			Status: &xov1alpha1.VaultSecretStatus{
 				LastReadTime: now,
 			},
-			R2Rs: map[int]Responce2Req{
+			R2Rs: map[int]utils.Responce2Req{
 				1: {
 					RequestURI:   path.Join("/v1/sys/internal/ui/mounts", prefix, secretPath),
 					ResponceCode: 200,
@@ -461,7 +462,7 @@ func TestCreateUpdate(t *testing.T) {
 			Status: &xov1alpha1.VaultSecretStatus{
 				LastReadTime: now,
 			},
-			R2Rs: map[int]Responce2Req{
+			R2Rs: map[int]utils.Responce2Req{
 				1: {
 					RequestURI:   path.Join("/v1/sys/internal/ui/mounts", prefix, secretPath),
 					ResponceCode: 200,
@@ -513,7 +514,7 @@ func TestCreateUpdate(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		client, ln, testDoer, sc := beforeEachTest(t, prefix)
+		client, ln, testDoer, sc := beforeEachTest(t, prefix, len(test.R2Rs))
 		defer ln.Close()
 		defer testDoer.Close()
 		r2rKeys := make([]int, 0, len(test.R2Rs))
