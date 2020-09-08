@@ -1,6 +1,7 @@
 package vaultpki
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/x509"
 	"fmt"
@@ -65,7 +66,12 @@ func (t *TLSCert) generateIntermediatePEM(tlsReq *xov1alpha1.TLSCertificate) err
 		return fmt.Errorf("requesting csr signing: %w", err)
 	}
 	// Marshal Private Key
-	privByte, err := x509.MarshalPKCS8PrivateKey(privKey)
+	var privByte []byte
+	if tlsReq.IntermediateCAPrivateKeyAlgorith == consts.PKIKeyAlgECPrime256 {
+		privByte, err = x509.MarshalECPrivateKey(privKey.(*ecdsa.PrivateKey))
+	} else {
+		privByte, err = x509.MarshalPKCS8PrivateKey(privKey)
+	}
 	if err != nil {
 		return err
 	}
