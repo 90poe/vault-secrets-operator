@@ -8,6 +8,7 @@ import (
 
 	xov1alpha1 "github.com/90poe/vault-secrets-operator/pkg/apis/xo/v1alpha1"
 	"github.com/90poe/vault-secrets-operator/pkg/certificates"
+	"github.com/90poe/vault-secrets-operator/pkg/consts"
 )
 
 func (t *TLSCert) generateIntermediatePEM(tlsReq *xov1alpha1.TLSCertificate) error {
@@ -68,7 +69,7 @@ func (t *TLSCert) generateIntermediatePEM(tlsReq *xov1alpha1.TLSCertificate) err
 	if err != nil {
 		return err
 	}
-	privPEM := certificates.GetPEMBundle(privByte, "PRIVATE KEY")
+	privPEM := certificates.GetPEMBundle(privByte, t.getPrivateKeyString(tlsReq))
 	t.PrivateKey = string(privPEM)
 	cert, _, ca, err := t.parseCertValuesFromSecret(secret)
 	if err != nil {
@@ -77,4 +78,13 @@ func (t *TLSCert) generateIntermediatePEM(tlsReq *xov1alpha1.TLSCertificate) err
 	t.Certificate = cert
 	t.IssuingCACertificate = ca
 	return nil
+}
+
+func (t *TLSCert) getPrivateKeyString(tlsReq *xov1alpha1.TLSCertificate) string {
+	ret := "PRIVATE KEY"
+
+	if tlsReq.IntermediateCAPrivateKeyAlgorith == consts.PKIKeyAlgECPrime256 {
+		ret = "EC PRIVATE KEY"
+	}
+	return ret
 }
