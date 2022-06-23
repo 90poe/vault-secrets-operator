@@ -44,7 +44,7 @@ func (t *TestDoer) httpCall(w http.ResponseWriter, req *http.Request) error {
 		w.WriteHeader(http.StatusNotFound)
 		return nil
 	}
-	//FOR INTERNAL REVIEW PURPOSES
+	// FOR INTERNAL REVIEW PURPOSES
 	// if req.Method == "PUT" || req.Method == "POST" {
 	// 	bytes, err := ioutil.ReadAll(req.Body)
 	// 	defer req.Body.Close()
