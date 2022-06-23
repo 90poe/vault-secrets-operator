@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	xov1alpha1 "github.com/90poe/vault-secrets-operator/pkg/apis/xo/v1alpha1"
+	xov1alpha1 "github.com/90poe/vault-secrets-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -27,23 +27,26 @@ var vaultSecret *xov1alpha1.VaultSecret = &xov1alpha1.VaultSecret{
 		Name: name,
 	},
 }
-var objs []runtime.Object = []runtime.Object{vaultSecret}
+var objs []client.Object = []client.Object{vaultSecret}
 
 func TestPatchUtilShouldPatchIfThereIsDifference(t *testing.T) {
+	// Create runtime scheme
+	s := scheme.Scheme
+	s.AddKnownTypes(xov1alpha1.GroupVersion, &xov1alpha1.VaultSecret{})
+
+	// Create fake client to mock API calls
+	clBuilder := fake.NewClientBuilder()
+	clBuilder.WithScheme(s)
+	clBuilder.WithObjects(objs...)
+	cl := clBuilder.Build()
+
 	// Create modified postgres
 	modvaultSecret := vaultSecret.DeepCopy()
 	modvaultSecret.Spec.Name = "Test"
 	modvaultSecret.Status.LastReadTime = time.Now().Unix()
 
-	// Create runtime scheme
-	s := scheme.Scheme
-	s.AddKnownTypes(xov1alpha1.SchemeGroupVersion, &xov1alpha1.VaultSecret{})
-
-	// Create fake client to mock API calls
-	cl := fake.NewFakeClient(objs...)
-
 	// Patch object
-	err := Patch(context.TODO(), cl, vaultSecret, modvaultSecret)
+	err := PatchVaultSecret(context.TODO(), cl, vaultSecret, modvaultSecret)
 	if err != nil {
 		t.Fatalf("could not patch object: (%v)", err)
 	}

@@ -19,7 +19,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-//Client struct would hold connection to Vault
+// Client struct would hold connection to Vault
 type Client struct {
 	address           string
 	skipVerify        bool
@@ -36,7 +36,7 @@ type Client struct {
 	pkis2CleanChan    chan string
 }
 
-//New would create Vault Client
+// New would create Vault Client
 func New(options ...Option) (*Client, error) {
 	c := Client{
 		authMethod:     "aws",
@@ -57,7 +57,7 @@ func New(options ...Option) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	//setup env
+	// setup env
 	err = os.Setenv("VAULT_ADDR", c.address)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func New(options ...Option) (*Client, error) {
 		return nil, err
 	}
 
-	//Get Vault client
+	// Get Vault client
 	err = c.getVaultClient()
 	if err != nil {
 		return nil, err
@@ -88,22 +88,22 @@ func New(options ...Option) (*Client, error) {
 	return &c, nil
 }
 
-//Logical would return Logical client of Vault
+// Logical would return Logical client of Vault
 func (c *Client) Logical() *api.Logical {
 	return c.connection.Logical()
 }
 
-//Address would return Vault HTTP(s) address
+// Address would return Vault HTTP(s) address
 func (c *Client) Address() string {
 	return c.address
 }
 
-//SkipVerify would return if we should skip Vault TLS cert verification
+// SkipVerify would return if we should skip Vault TLS cert verification
 func (c *Client) SkipVerify() bool {
 	return c.skipVerify
 }
 
-//AddPKI2Clean would add your PKI to cleanup
+// AddPKI2Clean would add your PKI to cleanup
 func (c *Client) AddPKI2Clean(pkiPath string) {
 	c.pkis2CleanChan <- pkiPath
 }
@@ -145,7 +145,7 @@ func (c *Client) GetRawSecret(fullPath string) (*api.Secret, error) {
 	return secret, err
 }
 
-//DeleteSecret would delete secret from Vault
+// DeleteSecret would delete secret from Vault
 func (c *Client) DeleteSecret(fullPath string) error {
 	logical := c.connection.Logical()
 
@@ -167,7 +167,7 @@ func (c *Client) DeleteSecret(fullPath string) error {
 	return nil
 }
 
-//CreateSecret would create secret in Vault
+// CreateSecret would create secret in Vault
 func (c *Client) CreateSecret(fullPath string, data map[string]interface{}) error {
 	logical := c.connection.Logical()
 
@@ -232,7 +232,7 @@ func (c *Client) GetSecretData(secret *api.Secret, dataPath string) (string, err
 	return sValue, nil
 }
 
-//getVaultClient would try to connect to Vault as Client
+// getVaultClient would try to connect to Vault as Client
 func (c *Client) getVaultClient() error {
 	// Create new Vault configuration. This configuration is used to create the
 	// API client. We set the timeout of the HTTP client to 60 seconds.
@@ -286,7 +286,7 @@ func generateLoginData() (map[string]interface{}, error) {
 	return loginData, nil
 }
 
-//getToken would get token after login
+// getToken would get token after login
 func (c *Client) getToken() error {
 	loginData, err := generateLoginData()
 	logical := c.connection.Logical()
@@ -317,7 +317,7 @@ func (c *Client) verify() error {
 	if len(strings.Trim(c.role, " ")) == 0 {
 		return fmt.Errorf("can't use empty Vault role")
 	}
-	if !reflect.ValueOf(c.logger).IsValid() {
+	if !reflect.ValueOf(c.logger.GetSink()).IsValid() {
 		return fmt.Errorf("can't use empty logger")
 	}
 	return nil
@@ -356,7 +356,7 @@ func (c *Client) renewToken() {
 	}
 }
 
-//pkiTidy would issue Tidy API call
+// pkiTidy would issue Tidy API call
 func (c *Client) pkiTidy() {
 	c.logger.Info("Launching PKI Tidy routine")
 	// Run PKI Tidy every 24 hours

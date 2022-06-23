@@ -1,3 +1,7 @@
+# Kubernetes Generated files - skip generated files, except for vendored files
+!vendor/**/zz_generated.*
+# editor and IDE paraphernalia
+.idea
 # Temporary Build Files
 build/_output
 build/_test
@@ -72,7 +76,7 @@ Session.vim
 # auto-generated tag files
 tags
 ### VisualStudioCode ###
-.vscode/*
+.vscode
 .history
 # End of https://www.gitignore.io/api/go,vim,emacs,visualstudiocode
 artifacts

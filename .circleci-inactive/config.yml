@@ -1,0 +1,89 @@
+version: 2
+jobs:
+  buildtest:
+    docker:
+      - image: circleci/golang:1.18
+    steps:
+      - checkout
+      - run: make test
+      - save_cache:
+          key: go-mod-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+  release:
+    docker:
+      - image: circleci/golang:1.18
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-{{ checksum "go.sum" }}
+      - run: make build
+  docs-build:
+    docker:
+      - image: python:3.9
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: pip install -r docs/requirements.txt
+      - run:
+          name: Build docs
+          command: cd docs/ && make html
+      - persist_to_workspace:
+          root: docs/_build
+          paths: html
+  docs-deploy:
+    docker:
+      - image: node:18.4.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: docs/_build
+      - run:
+          name: Install and configure dependencies
+          command: |
+            npm install -g gh-pages@4.0.0
+            git config user.email "ci-build@90poe.io"
+            git config user.name "ci-build"
+      - add_ssh_keys:
+          fingerprints:
+            - "b2:1b:aa:03:24:de:cd:aa:aa:0d:f6:ad:be:c9:85:19"
+      - run:
+          name: Deploy docs to gh-pages branch
+          command: gh-pages --dotfiles --message "chore - docs published to GitHub Pages" --dist docs/_build/html
+workflows:
+  version: 2
+  any-commit:
+    jobs:
+      - buildtest:
+          filters:
+            tags:
+              ignore: /.*/
+      - docs-build:
+          filters:
+            tags:
+              ignore: /.*/
+  release:
+    jobs:
+      - release:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+      - docs-build:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+      - docs-deploy:
+          requires:
+            - release
+            - docs-build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/

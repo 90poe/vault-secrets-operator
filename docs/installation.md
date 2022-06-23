@@ -32,3 +32,4 @@ Environment variables, which allow to configure operator:
 |VAULT_SKIP_VERIFY|No|Operator will allow TLS connections to Vault, protected with self signed certificate|1|
 |VAULT_ROLE_2_ASSUME|Yes|Role to assume on Vault|vault-secret-operator-role|
 |VAULT_SECRETS_PREFIX|Yes|Path in Vault, where your secrets are kept|secret/k8s|
+|MAX_CONCURRENT_RECONCILES|Yes|How many reconcile loops run concurrently|1|
