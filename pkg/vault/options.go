@@ -12,17 +12,14 @@ import (
 	"golang.org/x/net/context"
 )
 
-//Option is a type of options for Vault Client
+// Option is a type of options for Vault Client
 type Option func(*Client) error
 
-//Addr is option function to set Vault Addr for Client
+// Addr is option function to set Vault Addr for Client
 func Addr(addr string, skipVerify bool) Option {
 	return func(c *Client) error {
 		addr = strings.Trim(addr, " ")
-		pattern, err := regexp.Compile(consts.URLCheckRegexpPattern)
-		if err != nil {
-			return fmt.Errorf("can't compile URL check pattern: %w", err)
-		}
+		pattern := regexp.MustCompile(consts.URLCheckRegexpPattern)
 		if len(addr) == 0 {
 			return fmt.Errorf("address for Vault can't be empty")
 		}
@@ -35,7 +32,7 @@ func Addr(addr string, skipVerify bool) Option {
 	}
 }
 
-//Role is option function to set Vault login role for Client
+// Role is option function to set Vault login role for Client
 func Role(role string) Option {
 	return func(c *Client) error {
 		role = strings.Trim(role, " ")
@@ -47,7 +44,7 @@ func Role(role string) Option {
 	}
 }
 
-//SecretsPathPrefix is option function to set Vault secrets path prefix
+// SecretsPathPrefix is option function to set Vault secrets path prefix
 func SecretsPathPrefix(prefix string) Option {
 	return func(c *Client) error {
 		prefix = strings.Trim(prefix, " ")
@@ -59,7 +56,7 @@ func SecretsPathPrefix(prefix string) Option {
 	}
 }
 
-//ContextWithCancelFN is option function to set channel for termination notifications from renew
+// ContextWithCancelFN is option function to set channel for termination notifications from renew
 // and also set upstream context
 func ContextWithCancelFN(ctx context.Context, cancelFn context.CancelFunc) Option {
 	return func(c *Client) error {
@@ -75,7 +72,7 @@ func ContextWithCancelFN(ctx context.Context, cancelFn context.CancelFunc) Optio
 	}
 }
 
-//AuthMethod is option function to set Vault authentication method, only possibles are aws (default) and test (for testing)
+// AuthMethod is option function to set Vault authentication method, only possibles are aws (default) and test (for testing)
 func AuthMethod(authMethod string) Option {
 	return func(c *Client) error {
 		authMethod = strings.ToLower(strings.Trim(authMethod, " "))
@@ -87,7 +84,7 @@ func AuthMethod(authMethod string) Option {
 	}
 }
 
-//Timeout is option function to set Vault http client timeout
+// Timeout is option function to set Vault http client timeout
 func Timeout(timeout int) Option {
 	return func(c *Client) error {
 		c.timeout = timeout
@@ -106,12 +103,9 @@ func Logger(logger logr.Logger) Option {
 	}
 }
 
-//Config is option function to set Vault config (for test purposes mainly)
+// Config is option function to set Vault config (for test purposes mainly)
 func Config(config *api.Config) Option {
 	return func(c *Client) error {
-		if config == nil {
-			return fmt.Errorf("config for Vault can't be empty")
-		}
 		c.config = config
 		return nil
 	}

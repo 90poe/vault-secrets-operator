@@ -1,0 +1,75 @@
+name: pr_check vault-secrets-operator
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - reopened
+      - edited
+      - synchronize
+
+concurrency:
+  group: ci-tests-${{ inputs.git_repo }}-${{ github.ref }}-1
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install latest major GO version
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18' # The Go version to download
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: 'v1.46'
+          working-directory: '.'
+          args: --allow-parallel-runners -v --timeout 5m
+          skip-pkg-cache: true
+          skip-build-cache: true
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install latest major GO version
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18' # The Go version to download
+      
+      - name: Build executables locally
+        run:
+          make build
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install latest major GO version
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18' # The Go version to download
+      
+      - name: Test locally
+        run:
+          make test

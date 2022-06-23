@@ -23,6 +23,7 @@ func (c *Client) kvPreflightVersionRequest(path string) (string, int, error) {
 	defer c.connection.SetOutputCurlString(currentOutputCurlString)
 
 	r := c.connection.NewRequest("GET", "/v1/sys/internal/ui/mounts/"+path)
+	//nolint
 	resp, err := c.connection.RawRequest(r)
 	if resp != nil {
 		defer resp.Body.Close()
@@ -46,7 +47,10 @@ func (c *Client) kvPreflightVersionRequest(path string) (string, int, error) {
 	}
 	var mountPath string
 	if mountPathRaw, ok := secret.Data["path"]; ok {
-		mountPath = mountPathRaw.(string)
+		mountPath, ok = mountPathRaw.(string)
+		if !ok {
+			return "", 0, errors.New("can't cast mountPath to string")
+		}
 	}
 	options := secret.Data["options"]
 	if options == nil {
@@ -56,7 +60,10 @@ func (c *Client) kvPreflightVersionRequest(path string) (string, int, error) {
 	if versionRaw == nil {
 		return mountPath, 1, nil
 	}
-	version := versionRaw.(string)
+	version, ok := versionRaw.(string)
+	if !ok {
+		return mountPath, 1, nil
+	}
 	switch version {
 	case "", "1":
 		return mountPath, 1, nil

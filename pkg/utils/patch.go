@@ -4,16 +4,19 @@ import (
 	"context"
 	"reflect"
 
+	xov1alpha1 "github.com/90poe/vault-secrets-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//Patch would patch runtimeObj
-func Patch(ctx context.Context, cl client.Client, before runtime.Object, after runtime.Object) error {
-	resourcePatch := client.MergeFrom(before.DeepCopyObject())
-	statusPatch := client.MergeFrom(before.DeepCopyObject())
+// Patch would patch runtime Object
+func PatchVaultSecret(ctx context.Context, cl client.Client, before *xov1alpha1.VaultSecret, after *xov1alpha1.VaultSecret) error {
+	resBef := before.DeepCopy()
+	statBef := before.DeepCopy()
+	resourcePatch := client.MergeFrom(resBef)
+	statusPatch := client.MergeFrom(statBef)
 	// Convert resources to unstructured for easier comparison
 	beforeUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(before)
 	if err != nil {
@@ -33,7 +36,7 @@ func Patch(ctx context.Context, cl client.Client, before runtime.Object, after r
 	}
 	if ok {
 		beforeHasStatus = true
-		// Remove status from object so they can patched separately
+		// Remove status from object so they can be patched separately
 		unstructured.RemoveNestedField(beforeUnstructured, "status")
 	}
 	afterStatus, ok, err := unstructured.NestedFieldCopy(afterUnstructured, "status")
@@ -50,7 +53,7 @@ func Patch(ctx context.Context, cl client.Client, before runtime.Object, after r
 
 	// Check if there's any difference to patch
 	if !reflect.DeepEqual(beforeUnstructured, afterUnstructured) {
-		err = cl.Patch(ctx, after.DeepCopyObject(), resourcePatch)
+		err = cl.Patch(ctx, after, resourcePatch)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -58,7 +61,7 @@ func Patch(ctx context.Context, cl client.Client, before runtime.Object, after r
 
 	// Check if there's any difference in status to patch
 	if (beforeHasStatus || afterHasStatus) && !reflect.DeepEqual(beforeStatus, afterStatus) {
-		err = cl.Status().Patch(ctx, after.DeepCopyObject(), statusPatch)
+		err = cl.Status().Patch(ctx, after, statusPatch)
 		if err != nil {
 			errs = append(errs, err)
 		}
