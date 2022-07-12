@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.3.1
+VERSION ?= $(shell cat version.txt)
 SHELL := /bin/bash
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
@@ -27,8 +27,8 @@ define build_target
 	-mod=vendor \
 	-ldflags="-s -w \
 	-X github.com/90poe/vault-secrets-operator/pkg/version.Version=$(VERSION) \
-	-X github.com/90poe/vault-secrets-operator/pkg/version.BuildDate='$(NOW)' \
-	-X github.com/90poe/vault-secrets-operator/pkg/version.GitHash=$(GITHASH)" \
+	-X github.com/90poe/vault-secrets-operator/pkg/version.BuildDate='$(BUILT_AT)' \
+	-X github.com/90poe/vault-secrets-operator/pkg/version.GitHash=$(GIT_COMMIT)" \
 	-o bin/manager-$(1)-$(2) \
 	main.go ;
 endef
