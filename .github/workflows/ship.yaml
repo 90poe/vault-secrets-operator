@@ -1,0 +1,105 @@
+name: vault-secrets-operator ship action
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ci-ship-${{ inputs.git_repo }}-${{ github.ref }}-1
+  cancel-in-progress: true
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      
+      - uses: olegtarasov/get-tag@v2.1
+        id: tagName
+        with:
+          tagRegex: '(.*)'
+          tagRegexGroup: 1
+
+      - name: Create valid tag(s)
+        id: tags
+        run: |
+          name="vault-secrets-operator"
+          output="$name:${{ steps.tagName.outputs.tag }},$name:latest"
+          
+          echo "::set-output name=all_tags::${output}"
+
+      - name: Install latest major GO version
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'
+      
+      - name: Make build for ${{ steps.tags.outputs.all_tags }}
+        run: 
+          echo ${{ steps.tagName.outputs.tag }} > version.txt
+          make build
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+  
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+        # Only worked for us with this option on 🤷‍♂️
+        with:
+          install: true
+
+      - name: Login to Nexus Docker Registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_PASS }}
+
+      - name: Dockerise
+        uses: docker/build-push-action@v3
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: "linux/amd64,linux/arm64"
+          tags: ${{ steps.tags.outputs.all_tags }}
+          file: Dockerfile
+          push: false
+
+  docs-build:
+    runs-on: ubuntu-latest
+    container: node:18.4.0
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install Python, pipenv and Pipfile packages
+        uses: palewire/install-python-pipenv-pipfile@v2
+        with:
+          python-version: 3.10
+      
+      - name: Install pip requirements
+        run: pip install -r docs/requirements.txt
+      
+      - name: Make docs
+        working-directory: docs
+        run: make html
+      
+      - name: Install ship docs and required SSH keys
+        run:
+          npm install -g gh-pages@4.0.0
+          git config user.email "ci-build@90poe.io"
+          git config user.name "ci-build"
+          mkdir ~/.ssh || true
+          chmod 0700 ~/.ssh
+          echo "${{ secrets.PRIVATE_GITHUB_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 0600 ~/.ssh/id_rsa
+      
+      - name: Push generated docs
+        run:
+          gh-pages --dotfiles --message "chore - docs published to GitHub Pages" --dist docs/_build/html
