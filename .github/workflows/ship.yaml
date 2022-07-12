@@ -40,7 +40,7 @@ jobs:
       
       - name: Make build for ${{ steps.tags.outputs.all_tags }}
         run: 
-          echo ${{ steps.tagName.outputs.tag }} > version.txt
+          echo ${{ steps.tagName.outputs.tag }} > version.txt;
           make build
 
       - name: Set up QEMU
