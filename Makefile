@@ -141,7 +141,7 @@ test: manifests generate fmt vet $(SETUP_ENVTEST) ## Run tests.
 
 ##@ Build
 .PHONY: build
-build: generate fmt vet
+build: generate
 	$(foreach os,$(OSES),$(foreach arch,$(ARCHS),$(call build_target,$(os),$(arch))))
 
 .PHONY: local_build
