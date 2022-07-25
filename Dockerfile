@@ -1,9 +1,9 @@
 FROM debian:latest as build
 
-RUN apt update && apt install -y upx
+RUN apt update && apt install -y upx-ucl
 
 COPY ./bin/manager-linux-* /tmp/
-RUN ls /tmp/ && ls -la /tmp/
+
 RUN bash -c 'ARCH=$(uname -m); \
     [ "$ARCH" == "aarch64" ] && ARCH=arm64 || ARCH=amd64; \
     upx -o /manager /tmp/manager-linux-$ARCH'
