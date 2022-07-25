@@ -64,7 +64,7 @@ jobs:
           platforms: "linux/amd64,linux/arm64"
           tags: ${{ steps.tags.outputs.all_tags }}
           file: Dockerfile
-          push: false
+          push: true
 
   docs-build:
     runs-on: ubuntu-latest
