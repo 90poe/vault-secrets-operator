@@ -66,38 +66,9 @@ jobs:
           file: Dockerfile
           push: true
 
-  docs-build:
-    runs-on: ubuntu-latest
-    container: node:18.4.0
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
+      - name: Trigger RTDs build
+        uses: dfm/rtds-action@v1
         with:
-          fetch-depth: 1
-          submodules: recursive
-
-      - name: Install Python, pipenv and Pipfile packages
-        uses: palewire/install-python-pipenv-pipfile@v2
-        with:
-          python-version: 3.10
-      
-      - name: Install pip requirements
-        run: pip install -r docs/requirements.txt
-      
-      - name: Make docs
-        working-directory: docs
-        run: make html
-      
-      - name: Install ship docs and required SSH keys
-        run:
-          npm install -g gh-pages@4.0.0
-          git config user.email "ci-build@90poe.io"
-          git config user.name "ci-build"
-          mkdir ~/.ssh || true
-          chmod 0700 ~/.ssh
-          echo "${{ secrets.PRIVATE_GITHUB_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 0600 ~/.ssh/id_rsa
-      
-      - name: Push generated docs
-        run:
-          gh-pages --dotfiles --message "chore - docs published to GitHub Pages" --dist docs/_build/html
+          webhook_url: ${{ secrets.RTDS_WEBHOOK_URL }}
+          webhook_token: ${{ secrets.RTDS_WEBHOOK_TOKEN }}
+          commit_ref: ${{ github.ref }}
