@@ -28,7 +28,7 @@ jobs:
       - name: Create valid tag(s)
         id: tags
         run: |
-          name="vault-secrets-operator"
+          name="90poe/vault-secrets-operator"
           output="$name:${{ steps.tagName.outputs.tag }},$name:latest"
           
           echo "::set-output name=all_tags::${output}"
