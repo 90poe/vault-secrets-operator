@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'vault-secrets-operator'
-copyright = '2020, 90poe & vault-secrets-operator development tean'
+copyright = '2020, 90poe & vault-secrets-operator development team'
 author = 'vault-secrets-operator development team'
 
 
