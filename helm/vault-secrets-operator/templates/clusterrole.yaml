@@ -1,0 +1,48 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    {{- include "vault-secrets-operator.labels" . | nindent 4 }}
+    {{- with .Values.operator.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  name: {{ include "vault-secrets-operator.fullname" . }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - xo.90poe.io
+  resources:
+  - vaultsecrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - xo.90poe.io
+  resources:
+  - vaultsecrets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - xo.90poe.io
+  resources:
+  - vaultsecrets/status
+  verbs:
+  - get
+  - patch
+  - update

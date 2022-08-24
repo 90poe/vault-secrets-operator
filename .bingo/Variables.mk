@@ -17,11 +17,11 @@ GO     ?= $(shell which go)
 #	@echo "Running golangci-lint"
 #	@$(GOLANGCI_LINT) <flags/args..>
 #
-GOLANGCI_LINT := $(GOBIN)/golangci-lint-v1.46.2
+GOLANGCI_LINT := $(GOBIN)/golangci-lint-v1.48.0
 $(GOLANGCI_LINT): $(BINGO_DIR)/golangci-lint.mod
 	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
-	@echo "(re)installing $(GOBIN)/golangci-lint-v1.46.2"
-	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=golangci-lint.mod -o=$(GOBIN)/golangci-lint-v1.46.2 "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	@echo "(re)installing $(GOBIN)/golangci-lint-v1.48.0"
+	@cd $(BINGO_DIR) && $(GO) build -mod=mod -modfile=golangci-lint.mod -o=$(GOBIN)/golangci-lint-v1.48.0 "github.com/golangci/golangci-lint/cmd/golangci-lint"
 
 SETUP_ENVTEST := $(GOBIN)/setup-envtest-v0.0.0-20220617124632-165a8c869c43
 $(SETUP_ENVTEST): $(BINGO_DIR)/setup-envtest.mod

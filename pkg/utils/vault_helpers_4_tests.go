@@ -86,7 +86,10 @@ func MakeTestHTTPServer(t *testing.T, queueDepth int) (*api.Config, net.Listener
 
 	testCreateDoer := NewTestDoer(queueDepth)
 
-	server := &http.Server{Handler: http.HandlerFunc(testCreateDoer.httpCallHandler)}
+	server := &http.Server{
+		Handler:           http.HandlerFunc(testCreateDoer.httpCallHandler),
+		ReadHeaderTimeout: time.Second * 30,
+	}
 	//nolint
 	go server.Serve(ln)
 
