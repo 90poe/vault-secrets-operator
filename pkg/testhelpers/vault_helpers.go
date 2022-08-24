@@ -84,7 +84,10 @@ func HTTPServerWithAPI() (*api.Config, net.Listener, *TestDoer, error) {
 
 	testCreateDoer := NewTestDoer(5)
 
-	server := &http.Server{Handler: http.HandlerFunc(testCreateDoer.httpCallHandler)}
+	server := &http.Server{
+		Handler:           http.HandlerFunc(testCreateDoer.httpCallHandler),
+		ReadHeaderTimeout: time.Second * 30,
+	}
 	//nolint
 	go server.Serve(ln)
 	config := api.DefaultConfig()
