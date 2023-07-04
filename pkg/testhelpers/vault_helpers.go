@@ -3,7 +3,6 @@ package testhelpers
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
@@ -44,7 +43,7 @@ func (t *TestDoer) httpCall(w http.ResponseWriter, req *http.Request) error {
 	}
 	// FOR INTERNAL REVIEW PURPOSES
 	if req.Method == "PUT" || req.Method == "POST" {
-		bytes, err := ioutil.ReadAll(req.Body)
+		bytes, err := io.ReadAll(req.Body)
 		defer req.Body.Close()
 		if err != nil {
 			return err

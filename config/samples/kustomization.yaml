@@ -1,4 +1,5 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
 - xo_v1alpha1_vaultsecret.yaml
+- xo_v1alpha1_vaultcertificate.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

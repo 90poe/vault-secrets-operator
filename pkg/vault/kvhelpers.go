@@ -2,6 +2,7 @@ package vault
 
 import (
 	"errors"
+	"fmt"
 	"path"
 	"strings"
 
@@ -12,19 +13,19 @@ import (
 // engine is used for the given path.
 // This function is copy/past from the github.com/hashicorp/vault repository,
 // see: https://github.com/hashicorp/vault/blob/f843c09dd15ca4982e60fa12dea48c8f7d7e0373/command/kv_helpers.go#L44
-func (c *Client) kvPreflightVersionRequest(path string) (string, int, error) {
+func (v *vaultClient) kvPreflightVersionRequest(path string) (string, int, error) {
 	// We don't want to use a wrapping call here so save any custom value and
 	// restore after
-	currentWrappingLookupFunc := c.connection.CurrentWrappingLookupFunc()
-	c.connection.SetWrappingLookupFunc(nil)
-	defer c.connection.SetWrappingLookupFunc(currentWrappingLookupFunc)
-	currentOutputCurlString := c.connection.OutputCurlString()
-	c.connection.SetOutputCurlString(false)
-	defer c.connection.SetOutputCurlString(currentOutputCurlString)
+	currentWrappingLookupFunc := v.client.CurrentWrappingLookupFunc()
+	v.client.SetWrappingLookupFunc(nil)
+	defer v.client.SetWrappingLookupFunc(currentWrappingLookupFunc)
+	currentOutputCurlString := v.client.OutputCurlString()
+	v.client.SetOutputCurlString(false)
+	defer v.client.SetOutputCurlString(currentOutputCurlString)
 
-	r := c.connection.NewRequest("GET", "/v1/sys/internal/ui/mounts/"+path)
+	r := v.client.NewRequest("GET", "/v1/sys/internal/ui/mounts/"+path)
 	//nolint
-	resp, err := c.connection.RawRequest(r)
+	resp, err := v.client.RawRequest(r)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
@@ -78,8 +79,8 @@ func (c *Client) kvPreflightVersionRequest(path string) (string, int, error) {
 // secret engine is used.
 // This function is copy/past from the github.com/hashicorp/vault repository,
 // see: https://github.com/hashicorp/vault/blob/f843c09dd15ca4982e60fa12dea48c8f7d7e0373/command/kv_helpers.go#L99
-func (c *Client) isKVv2(path string) (string, bool, error) {
-	mountPath, version, err := c.kvPreflightVersionRequest(path)
+func (v *vaultClient) isKVv2(path string) (string, bool, error) {
+	mountPath, version, err := v.kvPreflightVersionRequest(path)
 	if err != nil {
 		return "", false, err
 	}
@@ -90,7 +91,7 @@ func (c *Client) isKVv2(path string) (string, bool, error) {
 // addPrefixToVKVPath adds the given prefix to the given path.
 // This function is copy/past from the github.com/hashicorp/vault repository,
 // see: https://github.com/hashicorp/vault/blob/f843c09dd15ca4982e60fa12dea48c8f7d7e0373/command/kv_helpers.go#L108
-func (c *Client) addPrefixToVKVPath(p, mountPath, apiPrefix string) string {
+func (v *vaultClient) addPrefixToVKVPath(p, mountPath, apiPrefix string) string {
 	switch {
 	case p == mountPath, p == strings.TrimSuffix(mountPath, "/"):
 		return path.Join(mountPath, apiPrefix)
@@ -98,4 +99,20 @@ func (c *Client) addPrefixToVKVPath(p, mountPath, apiPrefix string) string {
 		p = strings.TrimPrefix(p, mountPath)
 		return path.Join(mountPath, apiPrefix, p)
 	}
+}
+
+func (v *vaultClient) fixPath(path string) string {
+	// Check if the KVv1 or KVv2 is used for the provided secret and determin
+	// the mount path of the secrets engine.
+	mountPath, v2, err := v.isKVv2(path)
+	if err != nil {
+		// We can't check if path is v2 or not, thus returning path as it is
+		v.logger.Error(fmt.Errorf("can't check if path is v2 or not"), "")
+		return path
+	}
+
+	if v2 {
+		path = v.addPrefixToVKVPath(path, mountPath, "data")
+	}
+	return path
 }

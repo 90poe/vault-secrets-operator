@@ -49,11 +49,11 @@ type VaultSecretSpec struct {
 	//+kubebuilder:validation:Minimum=300
 	//+kubebuilder:validation:Maximum=31536000
 	//+kubebuilder:default=86400
-	ReReadIntervals int64 `json:"reread_intervals"`
+	ReReadIntervals int64 `json:"reread_intervals,omitempty"`
 	// Type is the type of the Kubernetes secret, which will be created by the
 	// VaultSecrets Operator. Default Opaque
 	//+kubebuilder:default=Opaque
-	Type corev1.SecretType `json:"type"`
+	Type corev1.SecretType `json:"type,omitempty"`
 }
 
 // VaultSecretStatus defines the observed state of VaultSecret
@@ -69,8 +69,8 @@ type VaultSecretStatus struct {
 	LatestError string `json:"latest_error,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // VaultSecret is the Schema for the vaultsecrets API
 type VaultSecret struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -80,7 +80,7 @@ type VaultSecret struct {
 	Status VaultSecretStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 // VaultSecretList contains a list of VaultSecret
 type VaultSecretList struct {
 	metav1.TypeMeta `json:",inline"`

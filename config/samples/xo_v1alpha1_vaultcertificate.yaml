@@ -1,0 +1,17 @@
+apiVersion: xo.90poe.io/v1alpha1
+kind: VaultCertificate
+metadata:
+  labels:
+    app.kubernetes.io/name: vaultcertificate
+    app.kubernetes.io/instance: vaultcertificate-sample
+    app.kubernetes.io/part-of: vault-secrets-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: vault-secrets-operator
+  name: vaultcertificate-sample
+spec:
+  name: vcert-sec
+  vault_pki_path: pki-mqtt
+  key_type: rsa
+  cn: test.zodiac.iot.drydock.studio
+  alt_names: ["*.zodiac.iot.drydock.studio"]
+  cert_ttl: 600
