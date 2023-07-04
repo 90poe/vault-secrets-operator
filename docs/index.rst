@@ -13,6 +13,7 @@ Welcome to vault-secrets-operator's documentation!
    installation
    FAQ
    vaultsecret_crd
+   vaultcertificate_crd
 
 .. toctree::
    :caption: CRD Reference
@@ -20,6 +21,7 @@ Welcome to vault-secrets-operator's documentation!
    :maxdepth: 0
 
    vaultsecret_crd
+   vaultcertificate_crd
 
 
 Indices and tables

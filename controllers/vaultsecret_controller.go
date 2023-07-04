@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/90poe/vault-secrets-operator/pkg/config"
+	"github.com/90poe/vault-secrets-operator/pkg/vaultclient"
 	"github.com/go-logr/logr"
 	vaultapi "github.com/hashicorp/vault/api"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +49,7 @@ type VaultSecretReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	// Added variables
-	vault *vault.Client
+	vault *vaultclient.Client
 	ctx   context.Context
 	// For test purposes
 	VaultAPI   *vaultapi.Config
@@ -133,18 +134,22 @@ func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger := log.FromContext(r.ctx).WithValues("Vault.Addr", c.VaultAddr, "Vault.Role", c.VaultRole2Assume)
-	authMethod := r.AuthMethod
-	if len(authMethod) == 0 {
-		authMethod = "aws"
-	}
-	vault, err := vault.New(
-		vault.Config(r.VaultAPI),
-		vault.Addr(c.VaultAddr, skipVerify),
-		vault.Role(c.VaultRole2Assume),
-		vault.SecretsPathPrefix(c.VaultSecretsPrefix),
-		vault.Logger(logger),
-		vault.AuthMethod(authMethod),
+	vaultInt, err := vault.New(
+		c.VaultAddr,
+		c.VaultRole2Assume,
+		skipVerify,
 		vault.ContextWithCancelFN(ctx, cancel),
+		vault.Logger(logger),
+	)
+	if err != nil {
+		logger.Error(err, "can't get vault client interface")
+		return nil
+	}
+	vault, err := vaultclient.New(
+		vaultclient.VaultClient(vaultInt),
+		vaultclient.SecretsPathPrefix(c.VaultSecretsPrefix),
+		vaultclient.ContextWithCancelFN(ctx, cancel),
+		vaultclient.Logger(logger),
 	)
 	if err != nil {
 		logger.Error(err, "can't get vault client")

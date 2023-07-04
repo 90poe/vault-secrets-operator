@@ -21,4 +21,18 @@ const (
 	TLSSerialHumanSeparator    = ":"
 	TLSSerialVaultSeparator    = "-"
 	SecretsFinalizer           = "finalizer.secretfromvault.xo.90poe.io"
+	ECDSACurvePattern          = `^(p224|p256|p384|p521)$`
+	CertTypePattern            = `^(rsa|ec|ecdsa)$`
+	// Error types for VaultCertificate
+	// 2 types: RevocerableError and UnrecoverableError
+	RecoverableError   = "RecoverableError"
+	UnrecoverableError = "UnrecoverableError"
+	SuccessReconcile   = "Success"
+	// Certificate Types
+	CertTypeRSA   = "rsa"
+	CertTypeEC    = "ec"
+	CertTypeECDCA = "ecdsa"
+	// CertCachePath points to cache dir path for certs in Vault
+	CertCachePath  = "secret/operator_certs"
+	CNParserRegexp = `^([a-z0-9][-a-z0-9]*[a-z0-9])?\.(.*)$`
 )
