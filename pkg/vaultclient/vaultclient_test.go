@@ -102,7 +102,7 @@ var _ = Describe("VaultClient", func() {
 			pkiPath = "pki-mqtt"
 		)
 		mockVaultClient.EXPECT().Read(
-			gomock.Eq(fmt.Sprintf("/v1/%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
 		).DoAndReturn(func(_ string) (*hvault.Secret, error) {
 			validUntil := time.Now().Add(24 * time.Hour)
 			cert, _, err := certificates.GenCertSelfSigned(CN, validUntil.UTC().Format("2006-01-02T15:04:05Z"))
@@ -130,7 +130,7 @@ var _ = Describe("VaultClient", func() {
 			pkiPath = "pki-mqtt"
 		)
 		mockVaultClient.EXPECT().Read(
-			gomock.Eq(fmt.Sprintf("/v1/%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
 		).DoAndReturn(func(_ string) (*hvault.Secret, error) {
 			return nil, fmt.Errorf("not found")
 		})
@@ -139,6 +139,38 @@ var _ = Describe("VaultClient", func() {
 		Expect(cert).To(BeEmpty())
 		Expect(key).To(BeEmpty())
 		Expect(CA).To(BeEmpty())
+	})
+	It("delete certificate from cache", func() {
+		var (
+			CN      = "some.test.com"
+			pkiPath = "pki-mqtt"
+		)
+		mockVaultClient.EXPECT().Delete(
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+		).DoAndReturn(func(_ string) (*hvault.Secret, error) {
+			return &hvault.Secret{
+				RequestID:     "ba0f8d29-262b-db3a-3660-746f593c97a7",
+				LeaseID:       "",
+				LeaseDuration: 2764800,
+				Data:          map[string]interface{}{},
+			}, nil
+		})
+		err := vaultClient.DelCertFromCache(pkiPath, CN)
+		Expect(err).To(BeNil())
+	})
+	It("can't delete certificate from cache", func() {
+		var (
+			CN      = "some.test.com"
+			pkiPath = "pki-mqtt"
+		)
+		mockVaultClient.EXPECT().Delete(
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+		).DoAndReturn(func(name string) (*hvault.Secret, error) {
+			return nil, fmt.Errorf("can't delete %s", name)
+		})
+		err := vaultClient.DelCertFromCache(pkiPath, CN)
+		Expect(err).To(Not(BeNil()))
+		Expect(err.Error()).To(HavePrefix("can't delete cached certificate for %s/%s", pkiPath, CN))
 	})
 })
 

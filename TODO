@@ -1,7 +1,4 @@
 # What do we want to add to VaultSecrets operator
 
-1. Make use of cache in Vault to store keys of certificates (VaultCert)
-1. Retry on recoverable errors (VaultCert)
 1. Add custom metrics for how many secrets created
 1. Decide what to do when Certificate Secret is deleted - shall we revoke cert in Vault?
-1. Run PKI Tidy in Vault itself
