@@ -11,13 +11,18 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"time"
 
 	"github.com/90poe/vault-secrets-operator/pkg/certificates"
 	"github.com/90poe/vault-secrets-operator/pkg/consts"
 	"github.com/90poe/vault-secrets-operator/pkg/vault"
 	"github.com/go-logr/logr"
 	hvault "github.com/hashicorp/vault/api"
+)
+
+const (
+	certCAPemKey  = "issuing_ca"
+	certPemKey    = "certificate"
+	certKeyPemKey = "private_key"
 )
 
 type (
@@ -141,20 +146,18 @@ func (c *Client) verify() error {
 func (c *Client) pkiTidy() {
 	c.logger.Info("Launching PKI Tidy routine")
 	// Run PKI Tidy every 24 hours
-	ticker := time.NewTicker(consts.VaultPKICleanupInHours * time.Hour)
-	defer ticker.Stop()
 	for {
 		select {
-		case t := <-ticker.C:
-			c.logger.Info(fmt.Sprintf("run PKI Tidy at: %v", t))
-			for pki := range c.pkis2Clean {
-				err := c.issuePkiTidy(pki)
-				if err != nil {
-					c.logger.Error(err, fmt.Sprintf("could not issue tidy up PKI request '%s'", pki))
-					c.cancelFn()
-				}
-			}
 		case pkiPath := <-c.pkis2CleanChan:
+			if _, ok := c.pkis2Clean[pkiPath]; ok {
+				// it's already on our PKI paths list - ignore it
+				continue
+			}
+			err := c.issuePkiTidy(pkiPath)
+			if err != nil {
+				// informational only error
+				c.logger.Info(fmt.Sprintf("could not issue auto-tidy up PKI request '%s': %v", pkiPath, err))
+			}
 			c.pkis2Clean[pkiPath] = true
 		case <-c.ctx.Done():
 			return
@@ -165,53 +168,79 @@ func (c *Client) pkiTidy() {
 // cleanup PKI CA cache from obsoleted certs
 func (c *Client) issuePkiTidy(pki string) error {
 	data := make(map[string]interface{}, 3)
+	data["enabled"] = true
+	data["tidy_revoked_cert_issuer_associations"] = true
 	data["tidy_cert_store"] = true
 	data["tidy_revoked_certs"] = true
 	data["safety_buffer"] = "1h"
-	_, err := c.client.Write(fmt.Sprintf("%s/tidy", pki), data)
+	data["interval_duration"] = "24h"
+	_, err := c.client.Write(fmt.Sprintf("%s/config/auto-tidy", pki), data)
 	if err != nil {
-		return fmt.Errorf("can't tidy up: %w", err)
+		return err
 	}
 	return nil
 }
 
-// splitCN will split CN into first part till first \. and rest domain name
-func (c *Client) splitCN(cn string) (first string, domain string, err error) {
+// GetCertFromCache will fetch certificates from cache
+// it will return: Cert, Key, CA, error if occured
+func (c *Client) GetCertFromCache(pkiPath string, cn string) (string, string, string, error) {
+	// 1. make paths to vault cache
+	path2Read, err := c.makeCacheCertPath(pkiPath, cn)
+	if err != nil {
+		return "", "", "", fmt.Errorf("can't get path to delete for %s/%s: %w", pkiPath, cn, err)
+	}
+	secret, err := c.client.Read(path2Read)
+	if err != nil {
+		return "", "", "", err
+	}
+	if secret == nil {
+		return "", "", "", &CacheMiss{
+			name: cn,
+		}
+	}
+	return readCertValues(secret)
+}
+
+// DelCertFromCache will delete certificate with pkiPath from cache
+func (c *Client) DelCertFromCache(pkiPath string, cn string) error {
+	path2Delete, err := c.makeCacheCertPath(pkiPath, cn)
+	if err != nil {
+		return fmt.Errorf("can't get path to delete for %s/%s: %w", pkiPath, cn, err)
+	}
+	_, err = c.client.Delete(path2Delete)
+	if err != nil {
+		return fmt.Errorf("can't delete cached certificate for %s/%s: %w", pkiPath, cn, err)
+	}
+	return nil
+}
+
+// PutToCache will put to cache certificate
+func (c *Client) PutToCache(pkiPath, cn string, cert *certificates.Certificate) error {
+	path2put, err := c.makeCacheCertPath(pkiPath, cn)
+	if err != nil {
+		return fmt.Errorf("can't get path to put for %s/%s: %w", pkiPath, cn, err)
+	}
+	_, err = c.client.Write(path2put, map[string]interface{}{
+		certCAPemKey:  cert.IssuingCA,
+		certPemKey:    cert.PemCert,
+		certKeyPemKey: cert.PemKey,
+	})
+	if err != nil {
+		return fmt.Errorf("can't write cert to cache %s/%s: %w", pkiPath, cn, err)
+	}
+	return nil
+}
+
+// makeCacheCertPath will make final certificate cache path
+func (c *Client) makeCacheCertPath(pkiPath string, cn string) (string, error) {
 	re := regexp.MustCompile(consts.CNParserRegexp)
 	splitArr := re.FindStringSubmatch(cn)
 	if splitArr == nil {
-		err = fmt.Errorf("CN='%s' doesn't match regexp `%s`", cn, consts.CNParserRegexp)
-		return
+		return "", fmt.Errorf("CN='%s' doesn't match regexp `%s`", cn, consts.CNParserRegexp)
 	}
-	first = splitArr[1]
-	domain = splitArr[2]
-	return
-}
-
-// GetCertFromCache will fetch certificates from cache
-// it will return: Cert, Key, CA, error if occured
-func (c *Client) GetCertFromCache(pkiPath string, cn string) (cert, key, ca string, err error) {
-	// 1. make paths to vault cache
-	var (
-		name, domain string
-		secret       *hvault.Secret
-	)
-	name, domain, err = c.splitCN(cn)
-	if err != nil {
-		return
-	}
-	path2Read := filepath.Join("/v1", consts.CertCachePath, pkiPath, domain, name)
-	secret, err = c.client.Read(path2Read)
-	if err != nil {
-		return
-	}
-	if secret == nil {
-		err = &CacheMiss{
-			name: cn,
-		}
-		return
-	}
-	return readCertValues(secret)
+	name := splitArr[1]
+	domain := splitArr[2]
+	return filepath.Join(consts.CertCachePath, pkiPath, domain, name), nil
 }
 
 // GetSignedCertificate is central point to come for new certificate, which might be provided from cache, signed by PKI's CA
@@ -287,13 +316,13 @@ func readCertValues(secret *hvault.Secret) (cert, key, ca string, err error) {
 			continue
 		}
 		switch k {
-		case "private_key":
+		case certKeyPemKey:
 			// nolint
 			key = v.(string)
-		case "certificate":
+		case certPemKey:
 			// nolint
 			cert = v.(string)
-		case "issuing_ca":
+		case certCAPemKey:
 			// nolint
 			ca = v.(string)
 		}
