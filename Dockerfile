@@ -1,12 +1,10 @@
 FROM debian:latest as build
 
-RUN apt update && apt install -y upx-ucl
-
 COPY ./bin/manager-linux-* /tmp/
 
 RUN bash -c 'ARCH=$(uname -m); \
     [ "$ARCH" == "aarch64" ] && ARCH=arm64 || ARCH=amd64; \
-    upx -o /manager /tmp/manager-linux-$ARCH'
+    cp /tmp/manager-linux-$ARCH /manager'
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
