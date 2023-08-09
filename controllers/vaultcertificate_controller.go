@@ -160,6 +160,7 @@ func (r *VaultCertificateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		vaultclient.SecretsPathPrefix(c.VaultSecretsPrefix),
 		vaultclient.ContextWithCancelFN(ctx, cancel),
 		vaultclient.Logger(logger),
+		vaultclient.TLSCertsCachePath(c.VaultTLSCachePath),
 	)
 	if err != nil {
 		logger.Error(err, "can't get vault client")

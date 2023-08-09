@@ -33,6 +33,5 @@ const (
 	CertTypeEC    = "ec"
 	CertTypeECDCA = "ecdsa"
 	// CertCachePath points to cache dir path for certs in Vault
-	CertCachePath  = "secret/operator_certs"
 	CNParserRegexp = `^([a-z0-9][-a-z0-9]*[a-z0-9])?\.(.*)$`
 )

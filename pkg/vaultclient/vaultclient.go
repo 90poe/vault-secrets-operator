@@ -32,6 +32,7 @@ type (
 		cancelFn          context.CancelFunc
 		client            vault.Client
 		secretsPathPrefix string
+		tlsCertsCachePath string
 		logger            logr.Logger
 		pkis2Clean        map[string]bool
 		pkis2CleanChan    chan string
@@ -240,7 +241,7 @@ func (c *Client) makeCacheCertPath(pkiPath string, cn string) (string, error) {
 	}
 	name := splitArr[1]
 	domain := splitArr[2]
-	return filepath.Join(consts.CertCachePath, pkiPath, domain, name), nil
+	return filepath.Join(c.tlsCertsCachePath, pkiPath, domain, name), nil
 }
 
 // GetSignedCertificate is central point to come for new certificate, which might be provided from cache, signed by PKI's CA

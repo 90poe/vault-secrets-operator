@@ -18,6 +18,7 @@ type Cfg struct {
 	VaultSkipVerify         string
 	VaultRole2Assume        string
 	VaultSecretsPrefix      string
+	VaultTLSCachePath       string
 	MaxConcurrentReconciles int
 	PKIs                    map[string]string
 }
@@ -35,6 +36,7 @@ func Get() *Cfg {
 		config.VaultSkipVerify = utils.MustGetEnv("VAULT_SKIP_VERIFY")
 		config.VaultRole2Assume = utils.MustGetEnv("VAULT_ROLE_2_ASSUME")
 		config.VaultSecretsPrefix = utils.MustGetEnv("VAULT_SECRETS_PREFIX")
+		config.VaultTLSCachePath = utils.MustGetEnv("VAULT_TLS_CACHE_PATH")
 		config.MaxConcurrentReconciles = utils.MustGetEnvInt("MAX_CONCURRENT_RECONCILES")
 		initPkis(config)
 	})
