@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/90poe/vault-secrets-operator/pkg/certificates"
-	"github.com/90poe/vault-secrets-operator/pkg/consts"
 	"github.com/90poe/vault-secrets-operator/pkg/mocks/vault"
 	"github.com/90poe/vault-secrets-operator/pkg/vaultclient"
 	hvault "github.com/hashicorp/vault/api"
@@ -16,6 +15,10 @@ import (
 	"go.uber.org/mock/gomock"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+)
+
+const (
+	certCachePath = "tls_cache"
 )
 
 var (
@@ -102,7 +105,7 @@ var _ = Describe("VaultClient", func() {
 			pkiPath = "pki-mqtt"
 		)
 		mockVaultClient.EXPECT().Read(
-			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", certCachePath, pkiPath)),
 		).DoAndReturn(func(_ string) (*hvault.Secret, error) {
 			validUntil := time.Now().Add(24 * time.Hour)
 			cert, _, err := certificates.GenCertSelfSigned(CN, validUntil.UTC().Format("2006-01-02T15:04:05Z"))
@@ -130,7 +133,7 @@ var _ = Describe("VaultClient", func() {
 			pkiPath = "pki-mqtt"
 		)
 		mockVaultClient.EXPECT().Read(
-			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", certCachePath, pkiPath)),
 		).DoAndReturn(func(_ string) (*hvault.Secret, error) {
 			return nil, fmt.Errorf("not found")
 		})
@@ -146,7 +149,7 @@ var _ = Describe("VaultClient", func() {
 			pkiPath = "pki-mqtt"
 		)
 		mockVaultClient.EXPECT().Delete(
-			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", certCachePath, pkiPath)),
 		).DoAndReturn(func(_ string) (*hvault.Secret, error) {
 			return &hvault.Secret{
 				RequestID:     "ba0f8d29-262b-db3a-3660-746f593c97a7",
@@ -164,7 +167,7 @@ var _ = Describe("VaultClient", func() {
 			pkiPath = "pki-mqtt"
 		)
 		mockVaultClient.EXPECT().Delete(
-			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", consts.CertCachePath, pkiPath)),
+			gomock.Eq(fmt.Sprintf("%s/%s/test.com/some", certCachePath, pkiPath)),
 		).DoAndReturn(func(name string) (*hvault.Secret, error) {
 			return nil, fmt.Errorf("can't delete %s", name)
 		})
@@ -185,6 +188,7 @@ var _ = BeforeSuite(func() {
 		vaultclient.VaultClient(mockVaultClient),
 		vaultclient.Logger(logTest),
 		vaultclient.ContextWithCancelFN(ctx, cancelfn),
+		vaultclient.TLSCertsCachePath(certCachePath),
 	)
 	Expect(err).NotTo(HaveOccurred())
 })

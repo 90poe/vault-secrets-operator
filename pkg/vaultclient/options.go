@@ -36,6 +36,18 @@ func SecretsPathPrefix(prefix string) Option {
 	}
 }
 
+// TLSCertsCachePath is option function to set Vault TLS certs cache path
+func TLSCertsCachePath(path string) Option {
+	return func(c *Client) error {
+		path = strings.Trim(path, " ")
+		if len(path) == 0 {
+			return fmt.Errorf("prefix to secrets within Vault can't be empty")
+		}
+		c.tlsCertsCachePath = path
+		return nil
+	}
+}
+
 // Logger will add logger to Vault client
 func Logger(logger logr.Logger) Option {
 	return func(c *Client) error {
