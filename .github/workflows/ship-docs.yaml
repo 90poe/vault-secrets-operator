@@ -1,0 +1,36 @@
+name: vault-secrets-operator ship action
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+
+concurrency:
+  group: ci-ship-${{ inputs.git_repo }}-${{ github.ref }}-1
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.RTDS_WEBHOOK_TOKEN }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - name: Install python
+        uses: actions/setup-python@v1
+      - name: Setup pip
+        uses: BSFishy/pip-action@v1
+        with:
+          requirements: docs/requirements.txt
+      - name: Build & ship docs
+        run: |
+          set -x
+          cd docs/ && make html && cd ..
+          npm install -g gh-pages@5.0.0
+          git config user.email "ci-build@90poe.io"
+          git config user.name "ci-build"
+          gh-pages --dotfiles --message "chore - docs published to GitHub Pages" --dist docs/_build/html
