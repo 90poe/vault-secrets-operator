@@ -23,6 +23,32 @@ rules:
 - apiGroups:
   - xo.90poe.io
   resources:
+  - vaultcertificates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - xo.90poe.io
+  resources:
+  - vaultcertificates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - xo.90poe.io
+  resources:
+  - vaultcertificates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - xo.90poe.io
+  resources:
   - vaultsecrets
   verbs:
   - create
