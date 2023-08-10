@@ -30,7 +30,7 @@ jobs:
         run: |
           set -x
           cd docs/ && make html && cd ..
-          npm install -g gh-pages@5.0.0
+          npm install -g gh-pages@4.0.0
           git config user.email "ci-build@90poe.io"
           git config user.name "ci-build"
           gh-pages --dotfiles --message "chore - docs published to GitHub Pages" --dist docs/_build/html
