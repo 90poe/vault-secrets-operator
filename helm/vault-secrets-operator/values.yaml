@@ -20,7 +20,7 @@ operator:
     ## for backwards compatibility consider setting the full image url via the repository value below
     ## use *either* current default registry/image or repository format or installing chart by providing the values.yaml will fail
     ## repository:
-    tag: "v0.3.6"
+    tag: "v0.4.1"
     pullPolicy: IfNotPresent
 
   # -- Annotations to be added to the operator Deployment
@@ -86,13 +86,13 @@ operator:
   hostname: {}
 
   # -- Optionally change this to ClusterFirstWithHostNet in case you have 'hostNetwork: true'.
-  # By default, while using host network, name resolution uses the host's DNS. 
-  # If you wish vault-secrets-operator to keep resolving names inside the k8s network, 
+  # By default, while using host network, name resolution uses the host's DNS.
+  # If you wish vault-secrets-operator to keep resolving names inside the k8s network,
   # use ClusterFirstWithHostNet.
   dnsPolicy: ClusterFirst
 
-  priorityClassName: ""  
-  
+  priorityClassName: ""
+
   # -- Security Context policies for operator pods
   podSecurityContext:
     runAsUser: 65532
@@ -128,8 +128,8 @@ operator:
   ##   periodSeconds: 5
   ##   timeoutSeconds: 2
   ##   successThreshold: 1
-  ##   failureThreshold: 5  
-  livenessProbe: 
+  ##   failureThreshold: 5
+  livenessProbe:
     httpGet:
       # should match container.healthCheckPath
       path: "/healthz"
@@ -180,7 +180,7 @@ operator:
   #    operator: "Equal|Exists"
   #    value: "value"
   #    effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
- 
+
   # -- Affinity and anti-affinity rules for server scheduling to nodes
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
