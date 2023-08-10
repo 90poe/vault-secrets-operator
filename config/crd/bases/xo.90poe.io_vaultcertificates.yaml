@@ -71,7 +71,7 @@ spec:
               type:
                 default: kubernetes.io/tls
                 description: Type is the type of the Kubernetes secret, which will
-                  be created by the VaultSecrets Operator. Default Opaque
+                  be created by the Type of secret. Default kubernetes.io/tls
                 type: string
               vault_pki_path:
                 description: Path PKI in Vault.
@@ -80,7 +80,6 @@ spec:
             required:
             - cn
             - name
-            - type
             - vault_pki_path
             type: object
           status:

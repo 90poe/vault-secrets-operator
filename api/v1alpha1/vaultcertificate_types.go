@@ -60,9 +60,9 @@ type VaultCertificateSpec struct {
 	//+kubebuilder:default=86400
 	CertTTL int `json:"cert_ttl,omitempty"`
 	// Type is the type of the Kubernetes secret, which will be created by the
-	// VaultSecrets Operator. Default Opaque
+	// Type of secret. Default kubernetes.io/tls
 	//+kubebuilder:default=kubernetes.io/tls
-	Type corev1.SecretType `json:"type"`
+	Type corev1.SecretType `json:"type,omitempty"`
 }
 
 // VaultCertificateStatus defines the observed state of VaultCertificate

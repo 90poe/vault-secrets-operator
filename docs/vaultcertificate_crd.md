@@ -5,16 +5,20 @@ Example:
 apiVersion: xo.90poe.io/v1alpha1
 kind: VaultCertificate
 metadata:
-  name: example-vaultcert
   labels:
-    app: example-vaultcert-app
-    owner: DevOps
+    app.kubernetes.io/name: vaultcertificate
+    app.kubernetes.io/instance: vaultcertificate-sample
+    app.kubernetes.io/part-of: vault-secrets-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: vault-secrets-operator
+  name: vaultcertificate-sample
 spec:
-  name: default-v1-test
-  reread_intervals: 300 # 10 minutes
-  type: kubernetes.io/dockerconfigjson
-  secrets_paths:
-    .dockerconfigjson: shared/nexus_dockerconfigjson
+  name: vcert-sec
+  vault_pki_path: pki-mqtt
+  key_type: rsa
+  cn: test.example.com
+  alt_names: ["*.example.com"]
+  cert_ttl: 600
 ```
 
 ## Spec
@@ -26,30 +30,11 @@ Spec section:
 |Settings|Type |Required|Notes|
 |--------|:---|:------|:---|
 |name|string|Yes|Name of Secret in K8S|
-|secrets_paths|map[string]string|Yes|List of Vault secrets you want to be added to K8S. See <a href="#SecretsPaths">SecretsPaths</a> for more details.|
-|provided_secrets|map[string]string|No|List of secrets you want to be added to K8S verbatim. Required in order to mix secrets from Vault with your own secrets from CRD.|
-|reread_intervals|int|Yes|Seconds how often to re-read secrets values from Vault|
-|type|v1.Secret K8S object Type string|Yes|Type of K8S secret, please see Kubernetes [docs](https://kubernetes.io/docs/concepts/configuration/secret/)|
-
-## SecretsPaths
-<a name="SecretPaths"></a>
-This map contains `keys` and `values`. `Keys` would be used in Secrets as data keys. And values would be fetched from Vault on path, specified by `values` in this structure.
-
-Full path, on which this operator is going to read secret from Vault is constructed as follows:
-**VAULT_SECRETS_PREFIX** / + value
-
-NOTE: **VAULT_SECRETS_PREFIX** is environment variable.
-
-Example:
-```
-spec:
-  ....
-  secrets_paths:
-    SOME_DATA: shared/very_secure_password
-```
-
-In here, `SOME_DATA` will be put to K8S secret as data key and value for it would be fetched from `$VAULT_SECRETS_PREFIX/shared/very_secure_password` in Vault.
-
-Operator is expecting special form for secret in Vault.
-You must have secret `shared/very_secure_password` hold key `value` or `base64_value` and your secret. If `value` is used for key in Vault, secret will be encoded with base64 before putting into K8S Secret object.
-If `base64_value` value is used (for binary or JSON objects), then oeprator expects that value is already encoded in Vault and will not perform additional encodind before putting to K8S Secret object.
+|vault_pki_path|string|Yes|Path PKI in Vault.|
+|key_type|string|No|Type of private key. Can be: rsa, ec, ecdsa. Default 'rsa'.|
+|key_length|uint|No|Keybits lenght of RSA certificate. Default 4096|
+|ecdsa_curve|string|No|Curve to use for ECDSA private key. Can be: p224,p256,p384,p521|
+|cn|string|Yes|CommonName of the TLS certificate|
+|alt_names|[]string|No|Alternative names of the TLS certificate. CN will be included if you don't add it yourself.|
+|cert_ttl|int|No|TTL of certificate in seconds. Default: 86400 (24 hour)|
+|type|string|Yes|Type of created secret in K8S. Default: kubernetes.io/tls|
