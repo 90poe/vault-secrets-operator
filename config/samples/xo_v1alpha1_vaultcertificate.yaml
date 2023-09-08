@@ -10,8 +10,8 @@ metadata:
   name: vaultcertificate-sample
 spec:
   name: vcert-sec
-  vault_pki_path: pki-mqtt
+  vault_pki_path: pki-path
   key_type: rsa
-  cn: test.zodiac.iot.drydock.studio
-  alt_names: ["*.zodiac.iot.drydock.studio"]
+  cn: test.some.com
+  alt_names: ["*.some.com"]
   cert_ttl: 600
