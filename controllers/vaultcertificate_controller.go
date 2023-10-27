@@ -20,7 +20,6 @@ import (
 	"context"
 	coreErrors "errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -29,29 +28,33 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	xov1alpha1 "github.com/90poe/vault-secrets-operator/api/v1alpha1"
-	"github.com/90poe/vault-secrets-operator/pkg/certificates"
-	"github.com/90poe/vault-secrets-operator/pkg/config"
-	"github.com/90poe/vault-secrets-operator/pkg/consts"
-	"github.com/90poe/vault-secrets-operator/pkg/utils"
-	"github.com/90poe/vault-secrets-operator/pkg/vault"
-	"github.com/90poe/vault-secrets-operator/pkg/vaultclient"
+	"github.com/90poe/vault-secrets-operator/internal/certificates"
+	"github.com/90poe/vault-secrets-operator/internal/config"
+	"github.com/90poe/vault-secrets-operator/internal/consts"
+	"github.com/90poe/vault-secrets-operator/internal/utils"
+	"github.com/90poe/vault-secrets-operator/internal/vault"
+	"github.com/90poe/vault-secrets-operator/internal/vaultclient"
 	"github.com/go-logr/logr"
 	vaultapi "github.com/hashicorp/vault/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
-	// Replace certificate 1min before it expires
-	SecondsBeforeExpire = time.Second * 60
+	// Replace certificate 10min before it expires
+	SecondsBeforeExpire = 600
+	// RequeToWorkAfterH will have 48 hours in seconds
+	RequeToWorkAfterH = 48 * 3600
 )
 
 // VaultCertificateReconciler reconciles a VaultCertificate object
@@ -59,8 +62,8 @@ type VaultCertificateReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	// Added variables
-	vault *vaultclient.Client
 	ctx   context.Context
+	vault vault.Client
 	// For test purposes
 	VaultAPI   *vaultapi.Config
 	AuthMethod string
@@ -78,151 +81,128 @@ func (r *VaultCertificateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	// 1. Check if we don't have Secret in cluster.
 	// 2. If we don't - create it
 	// 3. If we do - update it, which will check if we need to re-create secret
-	reqLogger := log.FromContext(r.ctx).WithValues("vaultcertificate", req.NamespacedName)
+	r.Log = log.FromContext(ctx).WithValues("vaultcertificate", req.NamespacedName)
+	r.ctx = ctx
 
 	// Fetch the VaultCertificate instance
 	instance := &xov1alpha1.VaultCertificate{}
-	err := r.Get(r.ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			reqLogger.Info("object deleted")
+			r.Log.V(1).Info("resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
 	}
 
-	if len(instance.Status.Conditions) > 0 {
-		// decide if we should stop reconcile and exit immediately
-		if ret, stop := r.decideToStopReconcilation(instance); stop {
-			return ret, nil
-		}
-	}
-
-	reqLogger.Info("Reconciling VaultCertificate")
-
 	before := instance.DeepCopy()
 	defer func() {
 		// Patch after every reconcile loop, if needed
-		err = utils.PatchVaultCertificate(r.ctx, r.Client, before, instance)
+		err = utils.PatchVaultCertificate(ctx, r.Client, before, instance)
 		if err != nil {
 			reterr = kerrors.NewAggregate([]error{reterr, err})
 		}
 	}()
+	// Get Vault client from our interface
+	vaultCl, err := createVaultClient(ctx, r.vault, r.Log)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if r.upsertCN2AltNames(instance) {
 		// we updated Alt names - lets re-run reconcile
 		return ctrl.Result{
 			Requeue: true,
-		}, err
+		}, nil
 	}
 
 	// Check if this Secret already exists
 	found := &corev1.Secret{}
-	err = r.Get(r.ctx, types.NamespacedName{
+	err = r.Get(ctx, types.NamespacedName{
 		Name:      instance.Spec.Name,
 		Namespace: instance.Namespace,
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
 		// Create secret
-		return r.createSecret(instance, found, false)
+		return r.createCertificateSecret(instance, vaultCl, found, false)
 	} else if err != nil {
 		// some other error occured
 		return ctrl.Result{}, err
 	}
 
 	// Update is required
-	return r.updateSecret(instance, found)
+	return r.updateCertificateSecret(instance, vaultCl, found)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VaultCertificateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	c := config.Get()
 	skipVerify := c.VaultSkipVerify == "1"
-	ctx, cancel := context.WithCancel(context.Background())
 
-	logger := log.FromContext(r.ctx).WithValues("Vault.Addr", c.VaultAddr, "Vault.Role", c.VaultRole2Assume)
+	logger := log.FromContext(context.TODO()).WithValues("Vault.Addr", c.VaultAddr, "Vault.Role", c.VaultRole2Assume)
 	vaultInt, err := vault.New(
 		c.VaultAddr,
 		c.VaultRole2Assume,
 		skipVerify,
-		vault.ContextWithCancelFN(ctx, cancel),
 		vault.Logger(logger),
 	)
 	if err != nil {
 		logger.Error(err, "can't get vault client interface")
 		return nil
 	}
-	vault, err := vaultclient.New(
-		vaultclient.VaultClient(vaultInt),
-		vaultclient.SecretsPathPrefix(c.VaultSecretsPrefix),
-		vaultclient.ContextWithCancelFN(ctx, cancel),
-		vaultclient.Logger(logger),
-		vaultclient.TLSCertsCachePath(c.VaultTLSCachePath),
-	)
-	if err != nil {
-		logger.Error(err, "can't get vault client")
-		return nil
-	}
-	go func() {
-		<-ctx.Done()
-		logger.Info("Fatal error occured, exiting")
-		os.Exit(1)
-	}()
-	r.vault = vault
-	r.ctx = ctx
+	r.vault = vaultInt
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&xov1alpha1.VaultCertificate{}).
 		Owns(&corev1.Secret{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: c.MaxConcurrentReconciles}).
+		WithEventFilter(ignoreUpdateDeletePredicate()).
 		Complete(r)
 }
 
-// decideToStopReconcilation will decide if we should stop reconcile and with what output
-// It will return either empty result and stop or continue bool (true or false)
-func (r *VaultCertificateReconciler) decideToStopReconcilation(instance *xov1alpha1.VaultCertificate) (reconcile.Result, bool) {
-	if instance.Status.Conditions[len(instance.Status.Conditions)-1].Reason == consts.RecoverableError {
-		// Return and requeue after 1 hour
-		return ctrl.Result{
-			Requeue:      true,
-			RequeueAfter: 1 * time.Hour,
-		}, false
+// ignoreUpdateDeletePredicater is brilliantly useful function, it will prevent multiple reconcile calls
+func ignoreUpdateDeletePredicate() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			genChanged := e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+			return genChanged
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			// Evaluates to false if the object has been confirmed deleted.
+			return !e.DeleteStateUnknown
+		},
 	}
-	if instance.Status.Conditions[len(instance.Status.Conditions)-1].Reason == consts.SuccessReconcile {
-		after := time.Now().After(instance.Status.Conditions[len(instance.Status.Conditions)-1].LastTransitionTime.Add(2 * time.Second))
-		// if last condition is success, check if it was more than 2 seconds ago
-		if after {
-			// it was more than 2 seconds ago - it must be delete or update, don't stop
-			return ctrl.Result{}, false
-		}
-	}
-	return ctrl.Result{}, true
 }
 
 // createSecret will create new Secret in K8S
-func (r *VaultCertificateReconciler) createSecret(instance *xov1alpha1.VaultCertificate,
+func (r *VaultCertificateReconciler) createCertificateSecret(instance *xov1alpha1.VaultCertificate,
+	vaultCl *vaultclient.Client,
 	found *corev1.Secret, update bool) (reconcile.Result, error) {
 	// validate PKI path is known in our config
 	if _, ok := config.Get().PKIs[instance.Spec.VaultPKIPath]; !ok {
 		return r.setLatestError(instance, errors.NewBadRequest(fmt.Sprintf("unknown PKI path '%s', not found in config", instance.Spec.VaultPKIPath)), consts.UnrecoverableError)
 	}
-	reqLogger := log.FromContext(r.ctx).WithName("Inserting Certificate Secret")
 
 	var cert *certificates.Certificate
 	var err error
 	if !update {
 		// try to get certificate from cache
-		cert, err = r.fetchCertFromCache(instance)
+		cert, err = r.fetchCertFromCache(instance, vaultCl)
 		if err != nil {
-			reqLogger.V(1).Info(fmt.Sprintf("missed cache (ignoring it), reason: %v", err))
+			r.Log.V(1).Info(fmt.Sprintf("missed cache (ignoring it), reason: %v", err))
 			cert = nil
 		}
 	}
 	if cert == nil {
+		if instance.Spec.ManualCreateSecret {
+			return r.setLatestError(instance, errors.NewBadRequest("ManualCreateSecret is set, but cert not found in cache - please add it"), consts.UnrecoverableError)
+		}
 		// create certificate and sign it
-		cert, err = r.createCert(instance)
+		cert, err = r.createCert(instance, vaultCl)
 		if err != nil {
 			return r.setLatestError(instance, err, consts.RecoverableError)
 		}
@@ -241,13 +221,13 @@ func (r *VaultCertificateReconciler) createSecret(instance *xov1alpha1.VaultCert
 	}
 
 	// Set VaultSecret instance as the owner and controller
-	reqLogger.V(1).Info(fmt.Sprintf("Setting controller reference on secret %s/%s",
+	r.Log.V(1).Info(fmt.Sprintf("Setting controller reference on secret %s/%s",
 		found.Namespace, found.Name))
 	if err = controllerutil.SetControllerReference(instance,
 		found, r.Scheme); err != nil {
 		return r.setLatestError(instance, err, consts.RecoverableError)
 	}
-	reqLogger.V(1).Info("Creating a new Secret", "Secret.Namespace",
+	r.Log.V(1).Info("Creating a new Secret", "Secret.Namespace",
 		found.Namespace, "Secret.Name", found.Name)
 	err = r.Create(r.ctx, found)
 	if err != nil {
@@ -255,7 +235,7 @@ func (r *VaultCertificateReconciler) createSecret(instance *xov1alpha1.VaultCert
 	}
 	// Secret created successfully
 	// check if AltNames has CN in them
-	reqLogger.Info("Inserted controlled secret",
+	r.Log.V(0).Info("Inserted controlled secret",
 		"Secret.Namespace", found.Namespace,
 		"Secret.Name", found.Name)
 	instance.Status.CertValidUntil = metav1.NewTime(cert.ValidUntil)
@@ -263,7 +243,12 @@ func (r *VaultCertificateReconciler) createSecret(instance *xov1alpha1.VaultCert
 	if update {
 		message = "succesfully updated"
 	}
-	return r.succReconcileRet(instance, reqLogger, message)
+	// Add PKI AutoTidy - several invocations will not hurt
+	err = vaultCl.PKIAutoTidy(instance.Spec.VaultPKIPath)
+	if err != nil {
+		r.Log.V(1).Info(fmt.Sprintf("PKI AutoTidy failed: %v", err))
+	}
+	return r.succReconcileRet(instance, message)
 }
 
 // upsertCN2AltNames will add CN to ALTNames if it's not there.
@@ -283,7 +268,7 @@ func (r *VaultCertificateReconciler) upsertCN2AltNames(instance *xov1alpha1.Vaul
 }
 
 // createCert will create and sign certificate
-func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertificate) (*certificates.Certificate, error) {
+func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertificate, vaultCl *vaultclient.Client) (*certificates.Certificate, error) {
 	// Create new certificate for signing
 	currTime := time.Now()
 	cert, err := certificates.New(instance.Spec.CommonName,
@@ -301,12 +286,12 @@ func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertif
 		return nil, err
 	}
 	// Sign certificate
-	cert, err = r.vault.GetSignedCertificate(instance.Spec.VaultPKIPath, config.Get().PKIs[instance.Spec.VaultPKIPath], cert)
+	cert, err = vaultCl.GetSignedCertificate(instance.Spec.VaultPKIPath, config.Get().PKIs[instance.Spec.VaultPKIPath], cert)
 	if err != nil {
 		return nil, err
 	}
 	// Put to cache
-	err = r.vault.PutToCache(instance.Spec.VaultPKIPath, cert.CommonName, cert)
+	err = vaultCl.PutToCache(instance.Spec.VaultPKIPath, cert.CommonName, cert)
 	if err != nil {
 		// Ignore if we couln't add it to cache, but inform
 		r.Log.V(1).Info(err.Error())
@@ -315,12 +300,15 @@ func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertif
 }
 
 // fetchCert will fetch certificate from and sign certificate
-func (r *VaultCertificateReconciler) fetchCertFromCache(instance *xov1alpha1.VaultCertificate) (*certificates.Certificate, error) {
-	cert, key, ca, err := r.vault.GetCertFromCache(config.Get().PKIs[instance.Spec.VaultPKIPath], instance.Spec.CommonName)
+func (r *VaultCertificateReconciler) fetchCertFromCache(
+	instance *xov1alpha1.VaultCertificate,
+	vaultCl *vaultclient.Client,
+) (*certificates.Certificate, error) {
+	cert, key, ca, err := vaultCl.GetCertFromCache(instance.Spec.VaultPKIPath, instance.Spec.CommonName)
 	if err != nil {
 		return nil, err
 	}
-	crl, err := r.vault.GetCRL(config.Get().PKIs[instance.Spec.VaultPKIPath])
+	crl, err := vaultCl.GetCRL(instance.Spec.VaultPKIPath)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +317,7 @@ func (r *VaultCertificateReconciler) fetchCertFromCache(instance *xov1alpha1.Vau
 		var invalid *certificates.CertificateInvalid
 		if coreErrors.As(err, &invalid) {
 			// delete invalid cert from cache
-			err2 := r.vault.DelCertFromCache(config.Get().PKIs[instance.Spec.VaultPKIPath], instance.Spec.CommonName)
+			err2 := vaultCl.DelCertFromCache(config.Get().PKIs[instance.Spec.VaultPKIPath], instance.Spec.CommonName)
 			if err2 != nil {
 				// error occured deleting from cache - inform only
 				r.Log.V(1).Info(err2.Error())
@@ -345,17 +333,16 @@ func (r *VaultCertificateReconciler) recreateIsRequired(
 	instance *xov1alpha1.VaultCertificate,
 	found *corev1.Secret,
 ) (bool, error) {
-	reqLogger := log.FromContext(r.ctx).WithName("Deleting Certificate Secret")
 	// First check if Type haven't changed. If it did - we need to re-create
 	if found.Type != instance.Spec.Type {
-		reqLogger.V(1).Info(fmt.Sprintf("secret type changed from '%s' to '%s'", found.Type, instance.Spec.Type))
+		r.Log.V(1).Info(fmt.Sprintf("secret type changed from '%s' to '%s'", found.Type, instance.Spec.Type))
 		return r.deleteSecretIsRequired(true, found)
 	}
 
 	// Also check if cert has not expired, then we also need to re-create
 	timeNow := metav1.NewTime(time.Now().Add(-SecondsBeforeExpire))
-	if !instance.Status.CertValidUntil.Before(&timeNow) {
-		reqLogger.V(1).Info(fmt.Sprintf("certificate expire at %v", timeNow))
+	if instance.Status.CertValidUntil.Before(&timeNow) {
+		r.Log.V(1).Info(fmt.Sprintf("certificate expire at %v", timeNow))
 		return r.deleteSecretIsRequired(true, found)
 	}
 	// check if certificate requirements have changed
@@ -364,11 +351,11 @@ func (r *VaultCertificateReconciler) recreateIsRequired(
 		return true, err
 	}
 	if oldCert.Leaf.Subject.CommonName != instance.Spec.CommonName {
-		reqLogger.V(1).Info(fmt.Sprintf("common name changed from '%s' to '%s'", oldCert.Leaf.Subject.CommonName, instance.Spec.CommonName))
+		r.Log.V(1).Info(fmt.Sprintf("common name changed from '%s' to '%s'", oldCert.Leaf.Subject.CommonName, instance.Spec.CommonName))
 		return r.deleteSecretIsRequired(true, found)
 	}
 	if !reflect.DeepEqual(oldCert.Leaf.DNSNames, instance.Spec.AltNames) {
-		reqLogger.V(1).Info(fmt.Sprintf("alt names changed from '%v' to '%v'", oldCert.Leaf.DNSNames, instance.Spec.AltNames))
+		r.Log.V(1).Info(fmt.Sprintf("alt names changed from '%v' to '%v'", oldCert.Leaf.DNSNames, instance.Spec.AltNames))
 		return r.deleteSecretIsRequired(true, found)
 	}
 
@@ -378,20 +365,20 @@ func (r *VaultCertificateReconciler) recreateIsRequired(
 	}
 	// check if private key type changed
 	if instance.Spec.KeyType != strings.ToLower(oldType) {
-		reqLogger.V(1).Info(fmt.Sprintf("private key type changed from '%s' to '%s'", strings.ToLower(oldType), instance.Spec.KeyType))
+		r.Log.V(1).Info(fmt.Sprintf("private key type changed from '%s' to '%s'", strings.ToLower(oldType), instance.Spec.KeyType))
 		return r.deleteSecretIsRequired(true, found)
 	}
 
 	// check if bit lenghts for private key changed
 	if instance.Spec.KeyType == consts.CertTypeRSA {
 		if instance.Spec.KeyLength != uint(oldLength) {
-			reqLogger.V(1).Info(fmt.Sprintf("RSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength))
+			r.Log.V(1).Info(fmt.Sprintf("RSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength))
 			return r.deleteSecretIsRequired(true, found)
 		}
 	}
 	if instance.Spec.KeyType == consts.CertTypeECDCA {
 		if instance.Spec.ECDSACurve == strings.ToLower(fmt.Sprintf("p%v", oldLength)) {
-			reqLogger.V(1).Info(fmt.Sprintf("ECDSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength))
+			r.Log.V(1).Info(fmt.Sprintf("ECDSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength))
 			return r.deleteSecretIsRequired(true, found)
 		}
 	}
@@ -402,31 +389,30 @@ func (r *VaultCertificateReconciler) recreateIsRequired(
 // deleteSecret will delete secret it takes required bool to have similar output type
 // as recreateIsRequired function, as it allows to return early
 func (r *VaultCertificateReconciler) deleteSecretIsRequired(req bool, found *corev1.Secret) (bool, error) {
-	reqLogger := log.FromContext(r.ctx).WithName("Deleting Certificate Secret")
 	err := r.Delete(r.ctx, found)
 	if err != nil {
 		return req, fmt.Errorf("can't delete secret %s/%s", found.Namespace, found.Name)
 	}
-	reqLogger.V(1).Info("Secret deleted",
+	r.Log.V(1).Info("Secret deleted",
 		"Secret.Namespace", found.Namespace, "Secret.Name", found.Name)
 	return req, nil
 }
 
 // we are going to recreate Cert and secret if it's required, otherways just reconcile before cert expiration
-func (r *VaultCertificateReconciler) updateSecret(
+func (r *VaultCertificateReconciler) updateCertificateSecret(
 	instance *xov1alpha1.VaultCertificate,
+	vaultCl *vaultclient.Client,
 	found *corev1.Secret,
 ) (reconcile.Result, error) {
-	reqLogger := log.FromContext(r.ctx).WithName("Updating Certificate Secret")
 	required, err := r.recreateIsRequired(instance, found)
 	if err != nil {
 		return r.setLatestError(instance, err, consts.UnrecoverableError)
 	}
 	if required {
 		// we recreating secret and old on is gone already
-		return r.createSecret(instance, &corev1.Secret{}, true)
+		return r.createCertificateSecret(instance, vaultCl, &corev1.Secret{}, true)
 	}
-	return r.succReconcileRet(instance, reqLogger, "no updates during reconcile were required")
+	return r.succReconcileRet(instance, "no updates during reconcile were required")
 }
 
 // setLatestError will set latest error on condition
@@ -438,41 +424,48 @@ func (r *VaultCertificateReconciler) setLatestError(
 	condition := metav1.Condition{
 		Type:               "Error",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Status:             "True",
+		Status:             metav1.ConditionTrue,
 		Reason:             errType,
 		Message:            fmt.Sprintf("%v", err),
 	}
-	cr.Status.Conditions = append(cr.Status.Conditions, condition)
-	return ctrl.Result{}, err
+	cr.Status.Condition = condition
+	r.Log.V(1).Error(err, "Error during reconcile", "Secret.Namespace", cr.Namespace, "Secret.Name", cr.Spec.Name)
+	return ctrl.Result{}, nil
 }
 
 // Function would always return reconcile with requeue and time to requeue
 func (r *VaultCertificateReconciler) succReconcileRet(cr *xov1alpha1.VaultCertificate,
-	reqLogger logr.Logger, message string) (reconcile.Result, error) {
+	message string) (reconcile.Result, error) {
 	diff := r.updateRequiredAt(cr)
+	r.Log.V(1).Info(fmt.Sprintf("we will require reconcyle after %v hours", diff.Hours()))
 	condition := metav1.Condition{
 		Type:               "Success",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Status:             "True",
+		Status:             metav1.ConditionTrue,
 		Reason:             consts.SuccessReconcile,
 		Message:            message,
 	}
-	cr.Status.Conditions = append(cr.Status.Conditions, condition)
-	reqLogger.Info(fmt.Sprintf("Done reconcile of certificate cn='%s'. Re-create certificate after %v at %v",
+	cr.Status.Condition = condition
+	r.Log.V(0).Info(fmt.Sprintf("Done reconcile of certificate cn='%s'. Reconcyle certificate after %v at %v",
 		cr.Spec.Name,
 		diff, time.Now().Add(diff)), "Secret.Namespace", cr.Namespace,
 		"Secret.Name", cr.Spec.Name)
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: diff,
 	}, nil
 }
 
 // updateRequired will check when certificate re-create is required
 func (r *VaultCertificateReconciler) updateRequiredAt(cr *xov1alpha1.VaultCertificate) time.Duration {
-	diff := time.Until(cr.Status.CertValidUntil.Time) - SecondsBeforeExpire
+	// We will use unix timestamp for compare
+	diff := (cr.Status.CertValidUntil.Unix() - SecondsBeforeExpire) - time.Now().Unix()
 	if diff < 0 {
 		diff = 0
 	}
-	return diff
+	// Is requeue larger than 48 hours?
+	if diff > RequeToWorkAfterH {
+		// we will reque after 48 hours
+		diff = RequeToWorkAfterH
+	}
+	return time.Duration(diff) * time.Second
 }
