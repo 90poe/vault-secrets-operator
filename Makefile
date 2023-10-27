@@ -136,12 +136,12 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet $(SETUP_ENVTEST) ## Run tests.
+test: $(SETUP_ENVTEST) ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --arch $(GOARCH) -p path)" go test ./... -coverprofile cover.out
 
 ##@ Build
 .PHONY: build
-build: generate
+build:
 	$(foreach os,$(OSES),$(foreach arch,$(ARCHS),$(call build_target,$(os),$(arch))))
 
 .PHONY: local_build

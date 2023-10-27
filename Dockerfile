@@ -1,4 +1,6 @@
-FROM debian:latest as build
+FROM alpine:latest as build
+
+RUN apk update && apk add bash
 
 COPY ./bin/manager-linux-* /tmp/
 

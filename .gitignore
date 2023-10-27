@@ -2,6 +2,7 @@
 !vendor/**/zz_generated.*
 # editor and IDE paraphernalia
 .idea
+__debug*
 # Temporary Build Files
 build/_output
 build/_test

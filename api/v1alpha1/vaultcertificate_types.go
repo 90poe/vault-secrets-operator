@@ -63,6 +63,10 @@ type VaultCertificateSpec struct {
 	// Type of secret. Default kubernetes.io/tls
 	//+kubebuilder:default=kubernetes.io/tls
 	Type corev1.SecretType `json:"type,omitempty"`
+	// ManualCreateSecret if true, then secret will not be created automatically
+	// +kubebuilder:default=true
+	// +kubebuilder:validation:Format=`^(true|false)$`
+	ManualCreateSecret bool `json:"manual_create_secret,omitempty"`
 }
 
 // VaultCertificateStatus defines the observed state of VaultCertificate
@@ -70,9 +74,9 @@ type VaultCertificateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Conditions store the status conditions of the Memcached instances
+	// Condition store the status condition of the VaultCertificate instances
 	// +operator-sdk:csv:customresourcedefinitions:type=status
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	Condition metav1.Condition `json:"condition,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 	// Cert expire date
 	CertValidUntil metav1.Time `json:"cert_valid_until,omitempty"`
 }

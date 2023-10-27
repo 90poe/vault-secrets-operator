@@ -2,3 +2,4 @@
 
 1. Add custom metrics for how many secrets created
 1. Decide what to do when Certificate Secret is deleted - shall we revoke cert in Vault?
+1. Rework Vault to use always current ctx
