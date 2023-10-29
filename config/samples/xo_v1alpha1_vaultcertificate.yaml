@@ -10,8 +10,8 @@ metadata:
   name: vaultcertificate-sample
 spec:
   name: vcert-sec
-  vault_pki_path: pki-staff
+  vault_pki_path: pki
   key_type: rsa
-  cn: openvpn-eks.vpn.dev-test.devopenocean.studio
+  cn: vpn.test.com
   alt_names: []
   cert_ttl: 600
