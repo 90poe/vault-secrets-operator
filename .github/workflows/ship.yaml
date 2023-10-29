@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 1
           submodules: recursive
-      
+
       - uses: olegtarasov/get-tag@v2.1
         id: tagName
         with:
@@ -30,22 +30,22 @@ jobs:
         run: |
           name="90poe/vault-secrets-operator"
           output="$name:${{ steps.tagName.outputs.tag }},$name:latest"
-          
+
           echo "::set-output name=all_tags::${output}"
 
       - name: Install latest major GO version
         uses: actions/setup-go@v3
         with:
-          go-version: '1.20'
-      
+          go-version: '1.21'
+
       - name: Make build for ${{ steps.tags.outputs.all_tags }}
-        run: 
+        run:
           echo ${{ steps.tagName.outputs.tag }} > version.txt;
           make build
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
-  
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
