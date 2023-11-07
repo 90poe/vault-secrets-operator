@@ -23,11 +23,9 @@ type Client interface {
 	Write(path string, data map[string]interface{}) (*hvault.Secret, error)
 	Delete(path string) (*hvault.Secret, error)
 	Address() string
-	SetContext(ctx context.Context)
 }
 
 type vaultClient struct {
-	ctx     context.Context
 	client  *hvault.Client
 	address string
 	role    string
@@ -106,38 +104,22 @@ func (v *vaultClient) verify() error {
 // Interface implementation functions
 func (v *vaultClient) Read(path string) (*hvault.Secret, error) {
 	logical := v.client.Logical()
-	if reflect.ValueOf(v.ctx).IsValid() {
-		// If we have walid context we use it to read from Vault
-		return logical.ReadWithContext(v.ctx, v.fixPath(path))
-	}
 	return logical.Read(v.fixPath(path))
 }
 
 func (v *vaultClient) Write(path string, data map[string]interface{}) (*hvault.Secret, error) {
 	logical := v.client.Logical()
-	if reflect.ValueOf(v.ctx).IsValid() {
-		// If we have walid context we use it to write to Vault
-		return logical.WriteWithContext(v.ctx, v.fixPath(path), data)
-	}
 	return logical.Write(v.fixPath(path), data)
 }
 
 func (v *vaultClient) Delete(path string) (*hvault.Secret, error) {
 	logical := v.client.Logical()
-	if reflect.ValueOf(v.ctx).IsValid() {
-		// If we have walid context we use it to delete from Vault
-		return logical.DeleteWithContext(v.ctx, v.fixPath(path))
-	}
 	return logical.Delete(v.fixPath(path))
 }
 
 // Address returns Vault address
 func (v *vaultClient) Address() string {
 	return v.client.Address()
-}
-
-func (v *vaultClient) SetContext(ctx context.Context) {
-	v.ctx = ctx
 }
 
 // getToken would get token after login 2 AWS
@@ -151,7 +133,7 @@ func (v *vaultClient) login() error {
 	if err != nil {
 		return fmt.Errorf("unable to create vault AWS auth client: %w", err)
 	}
-	apiSecret, err := awsAuth.Login(v.ctx, v.client)
+	apiSecret, err := awsAuth.Login(context.Background(), v.client)
 	if err != nil || apiSecret == nil {
 		return fmt.Errorf("unable to login with vault AWS auth client or apiSecret is nil: %w", err)
 	}

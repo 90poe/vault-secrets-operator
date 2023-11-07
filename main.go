@@ -35,6 +35,7 @@ import (
 
 	xov1alpha1 "github.com/90poe/vault-secrets-operator/api/v1alpha1"
 	"github.com/90poe/vault-secrets-operator/controllers"
+	"github.com/90poe/vault-secrets-operator/internal/healthchecker"
 	"github.com/90poe/vault-secrets-operator/version"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	// +kubebuilder:scaffold:imports
@@ -101,11 +102,12 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
-
-	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
+	// Add our custom health check
+	if err := mgr.AddHealthzCheck("health", healthchecker.OperatorHealthChecker); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
+	// Use default ready check
 	if err := mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)

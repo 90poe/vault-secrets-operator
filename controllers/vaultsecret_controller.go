@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/90poe/vault-secrets-operator/internal/config"
+	"github.com/90poe/vault-secrets-operator/internal/healthchecker"
 	"github.com/90poe/vault-secrets-operator/internal/utils"
 	"github.com/90poe/vault-secrets-operator/internal/vaultclient"
 	"github.com/go-logr/logr"
@@ -48,7 +49,7 @@ type VaultSecretReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	// Added variables
-	vault vault.Client
+	vault *vaultclient.Client
 	ctx   context.Context
 	// For test purposes
 	VaultAPI   *vaultapi.Config
@@ -104,12 +105,6 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// 3. Update CRD if required
 	// 4. Exit
 
-	// Get Vault client from our interface
-	vaultCl, err := createVaultClient(ctx, r.vault, r.Log)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Check if this Secret already exists
 	found := &corev1.Secret{}
 	err = r.Get(r.ctx, types.NamespacedName{
@@ -118,7 +113,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
 		// Create secret
-		return r.createSecret(instance, vaultCl, found)
+		return r.createSecret(instance, found)
 	} else if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -131,7 +126,7 @@ func (r *VaultSecretReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Normal update is required, without Type change
-	return r.updateSecret(instance, vaultCl, found)
+	return r.updateSecret(instance, found)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -147,10 +142,17 @@ func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		vault.Logger(logger),
 	)
 	if err != nil {
-		logger.Error(err, "can't get vault client interface")
-		return nil
+		return fmt.Errorf("can't get vault client interface: %w", err)
 	}
-	r.vault = vaultInt
+	r.vault, err = vaultclient.New(
+		vaultclient.VaultClient(vaultInt),
+		vaultclient.SecretsPathPrefix(c.VaultSecretsPrefix),
+		vaultclient.TLSCertsCachePath(c.VaultTLSCachePath),
+		vaultclient.Logger(logger),
+	)
+	if err != nil {
+		return fmt.Errorf("can't get vault client: %w", err)
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&xov1alpha1.VaultSecret{}).
 		Owns(&corev1.Secret{}).
@@ -162,12 +164,11 @@ func (r *VaultSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // createSecret will create new Secret in K8S
 func (r *VaultSecretReconciler) createSecret(
 	instance *xov1alpha1.VaultSecret,
-	vaultCl *vaultclient.Client,
 	found *corev1.Secret) (reconcile.Result, error) {
 	reqLogger := log.FromContext(r.ctx).WithName("Inserting")
 	// Create secret
 	// Add secrets from Vault to Secret object
-	err := r.populateVaultSecret(instance, vaultCl, found)
+	err := r.populateVaultSecret(instance, found)
 	if err != nil {
 		return r.setLatestError(instance, err)
 	}
@@ -215,13 +216,12 @@ func (r *VaultSecretReconciler) deleteSecret(
 
 func (r *VaultSecretReconciler) updateSecret(
 	instance *xov1alpha1.VaultSecret,
-	vaultCl *vaultclient.Client,
 	found *corev1.Secret) (reconcile.Result, error) {
 	reqLogger := log.FromContext(r.ctx).WithName("Updating")
 	// Normal update is required, without Type change
 	patch := client.MergeFrom(found.DeepCopy())
 	// Add secrets from Vault to Secret object
-	err := r.populateVaultSecret(instance, vaultCl, found)
+	err := r.populateVaultSecret(instance, found)
 	if err != nil {
 		return r.setLatestError(instance, err)
 	}
@@ -256,10 +256,9 @@ func (r *VaultSecretReconciler) updateSecret(
 // would return certificate serials (if any) and set finalizers if serials are found
 func (r *VaultSecretReconciler) populateVaultSecret(
 	instance *xov1alpha1.VaultSecret,
-	vaultCl *vaultclient.Client,
 	found *corev1.Secret) error {
 	// Add secrets from Vault to Secret object
-	newData, err := r.getSecretsFromVault(instance, vaultCl)
+	newData, err := r.getSecretsFromVault(instance)
 	if err != nil {
 		log.FromContext(r.ctx).Error(err, "can't read Secret(s) from Vault")
 		return err
@@ -310,13 +309,14 @@ func (r *VaultSecretReconciler) succReconcileRet(cr *xov1alpha1.VaultSecret,
 // getSecretsFromVault would fetch requered secrets from Vault
 func (r *VaultSecretReconciler) getSecretsFromVault(
 	cr *xov1alpha1.VaultSecret,
-	vaultCl *vaultclient.Client,
 ) (map[string][]byte, error) {
 	data := make(map[string][]byte)
 	// Get secrets from Vault
 	for key, value := range cr.Spec.SecretsPaths {
-		secValue, binary, err := vaultCl.GetSecret(value)
+		secValue, binary, err := r.vault.GetSecret(value)
 		if err != nil {
+			// all vault related issues are fatal
+			healthchecker.SetOperatorStatusError(err)
 			return nil, fmt.Errorf("can't make new Secret: %w", err)
 		}
 		if !binary {
