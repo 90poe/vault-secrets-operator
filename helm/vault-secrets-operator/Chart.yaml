@@ -2,7 +2,7 @@ apiVersion: v2
 name: vault-secrets-operator
 # Also update CHANGELOG.md
 version: 1.0.1
-appVersion: v0.5.0
+appVersion: v0.5.1
 home: https://github.com/90poe/vault-secrets-operator
 description: Vault Secrets Operator for Kubernetes. Creates K8S secrets from Vault secrets.
 icon: https://s3.amazonaws.com/website-assets.qualified.com/customer-experiences-production/hashi/qualified-vault-logo.png
