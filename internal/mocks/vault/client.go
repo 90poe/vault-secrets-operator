@@ -9,7 +9,6 @@
 package vault
 
 import (
-	context "context"
 	reflect "reflect"
 
 	api "github.com/hashicorp/vault/api"
@@ -81,18 +80,6 @@ func (m *MockClient) Read(path string) (*api.Secret, error) {
 func (mr *MockClientMockRecorder) Read(path any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockClient)(nil).Read), path)
-}
-
-// SetContext mocks base method.
-func (m *MockClient) SetContext(ctx context.Context) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetContext", ctx)
-}
-
-// SetContext indicates an expected call of SetContext.
-func (mr *MockClientMockRecorder) SetContext(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetContext", reflect.TypeOf((*MockClient)(nil).SetContext), ctx)
 }
 
 // Write mocks base method.

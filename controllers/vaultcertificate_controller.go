@@ -41,6 +41,7 @@ import (
 	"github.com/90poe/vault-secrets-operator/internal/certificates"
 	"github.com/90poe/vault-secrets-operator/internal/config"
 	"github.com/90poe/vault-secrets-operator/internal/consts"
+	"github.com/90poe/vault-secrets-operator/internal/healthchecker"
 	"github.com/90poe/vault-secrets-operator/internal/utils"
 	"github.com/90poe/vault-secrets-operator/internal/vault"
 	"github.com/90poe/vault-secrets-operator/internal/vaultclient"
@@ -63,7 +64,7 @@ type VaultCertificateReconciler struct {
 	Scheme *runtime.Scheme
 	// Added variables
 	ctx   context.Context
-	vault vault.Client
+	vault *vaultclient.Client
 	// For test purposes
 	VaultAPI   *vaultapi.Config
 	AuthMethod string
@@ -107,11 +108,6 @@ func (r *VaultCertificateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			reterr = kerrors.NewAggregate([]error{reterr, err})
 		}
 	}()
-	// Get Vault client from our interface
-	vaultCl, err := createVaultClient(ctx, r.vault, r.Log)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
 
 	if r.upsertCN2AltNames(instance) {
 		// we updated Alt names - lets re-run reconcile
@@ -128,14 +124,14 @@ func (r *VaultCertificateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}, found)
 	if err != nil && errors.IsNotFound(err) {
 		// Create secret
-		return r.createCertificateSecret(instance, vaultCl, found, false)
+		return r.createCertificateSecret(instance, found, false)
 	} else if err != nil {
 		// some other error occured
 		return ctrl.Result{}, err
 	}
 
 	// Update is required
-	return r.updateCertificateSecret(instance, vaultCl, found)
+	return r.updateCertificateSecret(instance, found)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -151,10 +147,17 @@ func (r *VaultCertificateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		vault.Logger(logger),
 	)
 	if err != nil {
-		logger.Error(err, "can't get vault client interface")
-		return nil
+		return fmt.Errorf("can't get vault client interface: %w", err)
 	}
-	r.vault = vaultInt
+	r.vault, err = vaultclient.New(
+		vaultclient.VaultClient(vaultInt),
+		vaultclient.SecretsPathPrefix(c.VaultSecretsPrefix),
+		vaultclient.TLSCertsCachePath(c.VaultTLSCachePath),
+		vaultclient.Logger(logger),
+	)
+	if err != nil {
+		return fmt.Errorf("can't get vault client: %w", err)
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&xov1alpha1.VaultCertificate{}).
 		Owns(&corev1.Secret{}).
@@ -180,7 +183,6 @@ func ignoreUpdateDeletePredicate() predicate.Predicate {
 
 // createSecret will create new Secret in K8S
 func (r *VaultCertificateReconciler) createCertificateSecret(instance *xov1alpha1.VaultCertificate,
-	vaultCl *vaultclient.Client,
 	found *corev1.Secret, update bool) (reconcile.Result, error) {
 	// validate PKI path is known in our config
 	if _, ok := config.Get().PKIs[instance.Spec.VaultPKIPath]; !ok {
@@ -191,7 +193,7 @@ func (r *VaultCertificateReconciler) createCertificateSecret(instance *xov1alpha
 	var err error
 	if !update {
 		// try to get certificate from cache
-		cert, err = r.fetchCertFromCache(instance, vaultCl)
+		cert, err = r.fetchCertFromCache(instance)
 		if err != nil {
 			r.Log.V(1).Info(fmt.Sprintf("missed cache (ignoring it), reason: %v", err))
 			cert = nil
@@ -202,7 +204,7 @@ func (r *VaultCertificateReconciler) createCertificateSecret(instance *xov1alpha
 			return r.setLatestError(instance, errors.NewBadRequest("ManualCreateSecret is set, but cert not found in cache - please add it"), consts.UnrecoverableError)
 		}
 		// create certificate and sign it
-		cert, err = r.createCert(instance, vaultCl)
+		cert, err = r.createCert(instance)
 		if err != nil {
 			return r.setLatestError(instance, err, consts.RecoverableError)
 		}
@@ -244,7 +246,7 @@ func (r *VaultCertificateReconciler) createCertificateSecret(instance *xov1alpha
 		message = "succesfully updated"
 	}
 	// Add PKI AutoTidy - several invocations will not hurt
-	err = vaultCl.PKIAutoTidy(instance.Spec.VaultPKIPath)
+	err = r.vault.PKIAutoTidy(instance.Spec.VaultPKIPath)
 	if err != nil {
 		r.Log.V(1).Info(fmt.Sprintf("PKI AutoTidy failed: %v", err))
 	}
@@ -268,7 +270,7 @@ func (r *VaultCertificateReconciler) upsertCN2AltNames(instance *xov1alpha1.Vaul
 }
 
 // createCert will create and sign certificate
-func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertificate, vaultCl *vaultclient.Client) (*certificates.Certificate, error) {
+func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertificate) (*certificates.Certificate, error) {
 	// Create new certificate for signing
 	currTime := time.Now()
 	cert, err := certificates.New(instance.Spec.CommonName,
@@ -286,12 +288,14 @@ func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertif
 		return nil, err
 	}
 	// Sign certificate
-	cert, err = vaultCl.GetSignedCertificate(instance.Spec.VaultPKIPath, config.Get().PKIs[instance.Spec.VaultPKIPath], cert)
+	cert, err = r.vault.GetSignedCertificate(instance.Spec.VaultPKIPath, config.Get().PKIs[instance.Spec.VaultPKIPath], cert)
 	if err != nil {
+		// all vault related issues are fatal
+		healthchecker.SetOperatorStatusError(err)
 		return nil, err
 	}
 	// Put to cache
-	err = vaultCl.PutToCache(instance.Spec.VaultPKIPath, cert.CommonName, cert)
+	err = r.vault.PutToCache(instance.Spec.VaultPKIPath, cert.CommonName, cert)
 	if err != nil {
 		// Ignore if we couln't add it to cache, but inform
 		r.Log.V(1).Info(err.Error())
@@ -302,14 +306,17 @@ func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertif
 // fetchCert will fetch certificate from and sign certificate
 func (r *VaultCertificateReconciler) fetchCertFromCache(
 	instance *xov1alpha1.VaultCertificate,
-	vaultCl *vaultclient.Client,
 ) (*certificates.Certificate, error) {
-	cert, key, ca, err := vaultCl.GetCertFromCache(instance.Spec.VaultPKIPath, instance.Spec.CommonName)
+	cert, key, ca, err := r.vault.GetCertFromCache(instance.Spec.VaultPKIPath, instance.Spec.CommonName)
 	if err != nil {
+		// all vault related issues are fatal
+		healthchecker.SetOperatorStatusError(err)
 		return nil, err
 	}
-	crl, err := vaultCl.GetCRL(instance.Spec.VaultPKIPath)
+	crl, err := r.vault.GetCRL(instance.Spec.VaultPKIPath)
 	if err != nil {
+		// all vault related issues are fatal
+		healthchecker.SetOperatorStatusError(err)
 		return nil, err
 	}
 	retCert, err := certificates.GetCertificateFromPem(cert, key, ca, crl)
@@ -317,9 +324,9 @@ func (r *VaultCertificateReconciler) fetchCertFromCache(
 		var invalid *certificates.CertificateInvalid
 		if coreErrors.As(err, &invalid) {
 			// delete invalid cert from cache
-			err2 := vaultCl.DelCertFromCache(config.Get().PKIs[instance.Spec.VaultPKIPath], instance.Spec.CommonName)
+			err2 := r.vault.DelCertFromCache(config.Get().PKIs[instance.Spec.VaultPKIPath], instance.Spec.CommonName)
 			if err2 != nil {
-				// error occured deleting from cache - inform only
+				// error occurred deleting from cache - inform only
 				r.Log.V(1).Info(err2.Error())
 			}
 		}
@@ -401,7 +408,6 @@ func (r *VaultCertificateReconciler) deleteSecretIsRequired(req bool, found *cor
 // we are going to recreate Cert and secret if it's required, otherways just reconcile before cert expiration
 func (r *VaultCertificateReconciler) updateCertificateSecret(
 	instance *xov1alpha1.VaultCertificate,
-	vaultCl *vaultclient.Client,
 	found *corev1.Secret,
 ) (reconcile.Result, error) {
 	required, err := r.recreateIsRequired(instance, found)
@@ -410,7 +416,7 @@ func (r *VaultCertificateReconciler) updateCertificateSecret(
 	}
 	if required {
 		// we recreating secret and old on is gone already
-		return r.createCertificateSecret(instance, vaultCl, &corev1.Secret{}, true)
+		return r.createCertificateSecret(instance, &corev1.Secret{}, true)
 	}
 	return r.succReconcileRet(instance, "no updates during reconcile were required")
 }
