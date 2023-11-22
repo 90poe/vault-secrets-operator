@@ -16,7 +16,7 @@ spec:
   selector:
     matchLabels:
       {{- include "vault-secrets-operator.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: operator
+      app.kubernetes.io/component: vault-secrets-operator
   {{- if not .Values.operator.autoscaling.enabled }}
   replicas: {{ .Values.operator.replicaCount }}
   {{- end }}
@@ -36,7 +36,7 @@ spec:
     {{- end }}
       labels:
         {{- include "vault-secrets-operator.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: operator
+        app.kubernetes.io/component: vault-secrets-operator
         {{- with .Values.operator.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
