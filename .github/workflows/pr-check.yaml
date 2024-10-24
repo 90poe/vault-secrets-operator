@@ -29,12 +29,12 @@ jobs:
           submodules: recursive
 
       - name: Install latest major GO version
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
         with:
           go-version: '1.21' # The Go version to download
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc # v3
+        uses: golangci/golangci-lint-action@971e284b6050e8a5849b72094c50ab08da042db8 # v6
         with:
           version: 'v1.54'
           working-directory: '.'
@@ -52,7 +52,7 @@ jobs:
           submodules: recursive
 
       - name: Install latest major GO version
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
         with:
           go-version: '1.21' # The Go version to download
 
@@ -74,7 +74,7 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_PASS }}
 
       - name: Dockerise
-        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
         with:
           context: ./
           builder: ${{ steps.buildx.outputs.name }}
@@ -93,7 +93,7 @@ jobs:
           submodules: recursive
 
       - name: Install latest major GO version
-        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
         with:
           go-version: '1.21' # The Go version to download
 
