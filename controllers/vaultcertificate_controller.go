@@ -275,7 +275,7 @@ func (r *VaultCertificateReconciler) createCert(instance *xov1alpha1.VaultCertif
 	currTime := time.Now()
 	cert, err := certificates.New(instance.Spec.CommonName,
 		instance.Spec.KeyType,
-		int(instance.Spec.KeyLength),
+		int(instance.Spec.KeyLength), // nolint:gosec
 		certificates.ValidUntil(currTime.Add(time.Duration(instance.Spec.CertTTL)*time.Second)),
 		certificates.ECDSACurve(instance.Spec.ECDSACurve),
 		certificates.AltNames(instance.Spec.AltNames),
@@ -378,14 +378,14 @@ func (r *VaultCertificateReconciler) recreateIsRequired(
 
 	// check if bit lenghts for private key changed
 	if instance.Spec.KeyType == consts.CertTypeRSA {
-		if instance.Spec.KeyLength != uint(oldLength) {
-			r.Log.V(1).Info(fmt.Sprintf("RSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength))
+		if instance.Spec.KeyLength != uint(oldLength) { // nolint:gosec
+			r.Log.V(1).Info(fmt.Sprintf("RSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength)) // nolint:gosec
 			return r.deleteSecretIsRequired(true, found)
 		}
 	}
 	if instance.Spec.KeyType == consts.CertTypeECDCA {
 		if instance.Spec.ECDSACurve == strings.ToLower(fmt.Sprintf("p%v", oldLength)) {
-			r.Log.V(1).Info(fmt.Sprintf("ECDSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength))
+			r.Log.V(1).Info(fmt.Sprintf("ECDSA private key bit lenght changed from '%v' to '%v'", uint(oldLength), instance.Spec.KeyLength)) // nolint:gosec
 			return r.deleteSecretIsRequired(true, found)
 		}
 	}

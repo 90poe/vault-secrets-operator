@@ -52,6 +52,9 @@
 //
 // Test `TestStandaloneSign` provides a complete example of using the signer
 // outside of the SDK and pre-escaping the URI path.
+//
+// Deprecated: aws-sdk-go is deprecated. Use aws-sdk-go-v2.
+// See https://aws.amazon.com/blogs/developer/announcing-end-of-support-for-aws-sdk-for-go-v1-on-july-31-2025/.
 package v4
 
 import (
@@ -125,6 +128,7 @@ var requiredSignedHeaders = rules{
 			"X-Amz-Copy-Source-Server-Side-Encryption-Customer-Algorithm": struct{}{},
 			"X-Amz-Copy-Source-Server-Side-Encryption-Customer-Key":       struct{}{},
 			"X-Amz-Copy-Source-Server-Side-Encryption-Customer-Key-Md5":   struct{}{},
+			"X-Amz-Expected-Bucket-Owner":                                 struct{}{},
 			"X-Amz-Grant-Full-control":                                    struct{}{},
 			"X-Amz-Grant-Read":                                            struct{}{},
 			"X-Amz-Grant-Read-Acp":                                        struct{}{},

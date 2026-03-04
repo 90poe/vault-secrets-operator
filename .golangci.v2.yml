@@ -1,0 +1,117 @@
+version: "2"
+
+run: # options for analysis running
+  # run.timeout: the existing value is ignored because, in v2, there is no timeout by default.
+  # timeout: 2m
+  concurrency: 4 # default concurrency is a available CPU number
+  modules-download-mode: readonly # enables gomod and disable changing of go.mod file
+linters:
+  enable:
+    - errorlint
+    - goconst
+    - gocritic
+    - gocyclo
+    - gosec
+    - lll
+    - makezero
+    - paralleltest
+    - predeclared
+    - thelper
+    - unconvert
+  settings:
+    # nolintlint:
+    #   # Disable to ensure that all nolint directives actually have an effect.
+    #   # Default: false
+    #   allow-unused: true
+    #   # Exclude following linters from requiring an explanation.
+    #   # Default: []
+    #   allow-no-explanation: []
+    #   # Enable to require an explanation of nonzero length after each nolint directive.
+    #   # Default: false
+    #   require-explanation: true
+    #   # Enable to require nolint directives to mention the specific linter being suppressed.
+    #   # Default: false
+    #   require-specific: true
+    dupl:
+      # tokens count to trigger issue, 150 by default
+      threshold: 200
+    errcheck:
+      check-type-assertions: true # report about not checking of errors in type assetions: `a := b.(MyStruct)`;
+      check-blank: true # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
+    errorlint:
+      errorf: true
+    gocyclo:
+      min-complexity: 20 # minimal code complexity to report, 30 by default (but we recommend 10-20)
+    govet:
+      # report about shadowed variables
+      enable:
+        - shadow
+    lll:
+      # max line length, lines longer will be reported. Default is 120.
+      # '\t' is counted as 1 character by default, and can be changed with the tab-width option
+      line-length: 200
+    nakedret:
+      max-func-lines: 60 # make an issue if func has more lines of code than this setting and it has naked returns
+    prealloc:
+      simple: true # Report preallocation suggestions only on simple loops that have no returns/breaks/continues/gotos in them.
+      range-loops: true # Report preallocation suggestions on range loops
+      for-loops: false # Report preallocation suggestions on for loops
+    unparam:
+      check-exported: true # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
+    staticcheck:
+      checks:
+        - all
+        - '-QF1008' # Disabled linter QF1008 - Omit embedded fields from selector expression. Reference: https://staticcheck.dev/docs/checks#QF1008
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclusions:
+    generated: lax
+    # issues.exclude-use-default has been replaced with linters.exclusions.presets
+    # Independently from option `exclude` we use default exclude patterns,
+    # it can be disabled by this option. To list all
+    # excluded by default patterns execute `golangci-lint run --help`.
+    # Default value for this option is true.
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    # issues.exclude-rules has been replaced with linters.exclusions.rules.
+    rules:
+      # Exclude some linters from running on tests files.
+      - path: _test\.go
+        linters:
+          - dupl
+          - gosec
+      - text: 'shadow: declaration of "err" shadows declaration at'
+        linters:
+          - govet
+    paths:
+      - internal/core/mock_service.go
+      - internal/infrastructure/mock_logger.go
+      - internal/grpc/mock_transformer.go
+      - api
+      - artifacts
+      - docs
+      - test/service/lib
+      - test/service/results
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - internal/core/mock_service.go
+      - internal/infrastructure/mock_logger.go
+      - internal/grpc/mock_transformer.go
+      - api
+      - artifacts
+      - docs
+      - test/service/lib
+      - test/service/results
+      - third_party$
+      - builtin$
+      - examples$
+

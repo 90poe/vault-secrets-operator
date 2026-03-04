@@ -61,7 +61,7 @@ func NewCertificate(cert *x509.Certificate, revoked bool) *Certificate {
 func GetCertificateFromPem(cert, key, ca string, crl *x509.RevocationList) (*Certificate, error) {
 	valid := true
 	if crl != nil {
-		valid, cn, err := IsCertificateValid(cert, crl)
+		valid, cn, err := IsCertificateValid(cert, crl) // nolint:govet
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +229,7 @@ func (c *Certificate) PublicKey() any {
 	case *ecdsa.PrivateKey:
 		return &k.PublicKey
 	case ed25519.PrivateKey:
-		return k.Public().(ed25519.PublicKey)
+		return k.Public().(ed25519.PublicKey) // nolint:errcheck
 	default:
 		return nil
 	}

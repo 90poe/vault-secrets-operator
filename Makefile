@@ -11,6 +11,7 @@ BUILT_AT ?= $(shell date +%s)
 GIT_COMMIT ?= $(shell git describe --dirty --always)
 ARCHS := arm64 amd64
 OSES := linux
+GOLANGCI_LINT_VERSION := v2.10.1
 
 ifeq ($(GOOS), darwin)
 	ifeq ($(GOARCH), arm64)
@@ -35,8 +36,10 @@ endef
 
 include .bingo/Variables.mk
 .PHONY: lint
-lint: $(GOLANGCI_LINT)
-	$(GOLANGCI_LINT) run --allow-parallel-runners -c .golangci.yml
+lint: 
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) \
+		run --path-mode=abs --allow-parallel-runners -v --timeout 5m \
+		-c .golangci.v2.yml
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
