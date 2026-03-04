@@ -41,6 +41,7 @@ var (
 )
 
 func TestUTILSs(t *testing.T) {
+	t.Parallel()
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Utilities Suite")

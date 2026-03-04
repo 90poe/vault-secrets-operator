@@ -57,7 +57,7 @@ func (v *vaultClient) kvPreflightVersionRequest(path string) (string, int, error
 	if options == nil {
 		return mountPath, 1, nil
 	}
-	versionRaw := options.(map[string]interface{})["version"]
+	versionRaw := options.(map[string]interface{})["version"] // nolint:errcheck
 	if versionRaw == nil {
 		return mountPath, 1, nil
 	}
