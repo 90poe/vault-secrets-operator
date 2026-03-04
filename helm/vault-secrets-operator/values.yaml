@@ -8,8 +8,13 @@
 ## Labels to apply to all resources
 ##
 commonLabels: {}
-# scmhash: abc123
-# myLabel: aakkmd
+eks:
+  # -- Create EKS pod identity association resources
+  create: true
+  # -- EKS cluster name
+  clusterName: ""
+  # -- EKS IAM Role ARN for the operator
+  iamRoleArn: ""
 
 operator:
   # -- Configures the operator container name

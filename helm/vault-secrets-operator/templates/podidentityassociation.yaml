@@ -1,0 +1,15 @@
+{{- $eks := .Values.eks }}
+{{- if or $eks.create -}}
+---
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: PodIdentityAssociation
+metadata:
+  name: {{ include "vault-secrets-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  clusterName: {{ $eks.clusterName | default "unknown-cluster-name" }}
+  disableSessionTags: false
+  namespace: {{ .Release.Namespace }}
+  roleARN: {{ $eks.iamRoleArn | default "unknown-role-arn" }}
+  serviceAccount: {{ template "vault-secrets-operator.serviceAccountName" . }}
+{{- end }}
